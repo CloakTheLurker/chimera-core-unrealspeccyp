@@ -1,0 +1,14 @@
+# patches/series — intentionally empty at M0.
+#
+# M0 needs no upstream patches: the benchmark seams (USE_BENCHMARK) already
+# compile out the window system, so the headless native build uses upstream
+# verbatim. Patches start at M1 (the virtual-time seam).
+#
+# Rules (chimera/docs/porting-a-core.md): a clean tree gets the whole series,
+# a dirty tree is taken to already have it; never detect one by one
+# (git apply --reverse --check on one patch fails the moment a neighbour
+# moves its lines). Every patch is a build option or a hook, never a
+# deletion. To regenerate a middle patch, snapshot the files before the edit
+# and diff -u against that — never git diff across two patches' files.
+# Check the tree is really there: compare rev-parse --show-toplevel with the
+# path you meant before applying.

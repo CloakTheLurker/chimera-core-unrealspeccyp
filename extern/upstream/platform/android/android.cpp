@@ -1,0 +1,429 @@
+/*
+Portable ZX-Spectrum emulator.
+Copyright (C) 2001-2026 SMT, Dexus, Alone Coder, deathsoft, djdron, scor
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "../platform.h"
+
+#ifdef _ANDROID
+
+#include <jni.h>
+#include "../io.h"
+#include "../../options_common.h"
+#include "../../tools/options.h"
+#include "../../tools/profiler.h"
+#include "../touch_ui/tui_keyboard.h"
+#include "../touch_ui/tui_joystick.h"
+#include "../gles2/gles2.h"
+#include "../gles2/gles2_sprite.h"
+
+PROFILER_DECLARE(u_vid);
+PROFILER_DECLARE(u_aud);
+PROFILER_DECLARE(pro0);
+PROFILER_DECLARE(pro1);
+PROFILER_DECLARE(pro2);
+PROFILER_DECLARE(pro3);
+
+byte sos128_0[16384];
+byte sos128_1[16384];
+byte sos48[16384];
+byte service[16384];
+byte dos513f[16384];
+byte spxtrm4f[2048];
+
+namespace xPlatform
+{
+void ProcessKey(char key, bool down, bool shift, bool alt);
+void InitSound();
+void DoneSound();
+int UpdateSound(bool skip_data);
+
+static struct eOptionAVTimerSync : public xOptions::eOptionBool
+{
+	virtual const char* Name() const { return "av timer sync"; }
+	virtual int Order() const { return 3; }
+} op_av_timer_sync;
+
+static struct eOptionSkipFrames : public xOptions::eOptionInt
+{
+	eOptionSkipFrames() { Set(0); }
+	virtual const char* Name() const { return "skip frames"; }
+	virtual const char** Values() const
+	{
+		static const char* values[] = { "none", "1", "2", "3", "4", "5", NULL };
+		return values;
+	}
+	virtual int Order() const { return 4; }
+} op_skip_frames;
+
+static struct eOptionUseSensor : public xOptions::eOptionBool
+{
+	virtual const char* Name() const { return "use sensor"; }
+	virtual int Order() const { return 5; }
+} op_use_sensor;
+
+static struct eOptionUseKeyboard : public xOptions::eOptionBool
+{
+	eOptionUseKeyboard() { Set(true); }
+	virtual const char* Name() const { return "use keyboard"; }
+	virtual int Order() const { return 6; }
+} op_use_keyboard;
+
+static void Init(const char* path)
+{
+	const char* res = "/";
+	OpLastFile(res);
+//	xIo::SetResourcePath(res);
+	char buf[xIo::MAX_PATH_LEN];
+	strcpy(buf, path);
+	strcat(buf, "/");
+	xIo::SetProfilePath(buf);
+	Handler()->OnInit();
+	InitSound();
+}
+static void Done()
+{
+	DoneSound();
+	Handler()->OnDone();
+}
+
+}
+//namespace xPlatform
+
+template<class T> static int GetOption(const char* name)
+{
+	xOptions::eOption<T>* o = xOptions::eOption<T>::Find(name);
+	return o ? *o : T(0);
+}
+template<class T> static void SetOption(const char* name, const T& value)
+{
+	xOptions::eOption<T>* o = xOptions::eOption<T>::Find(name);
+	if(o)
+	{
+		o->Set(value);
+		o->Apply();
+	}
+}
+
+extern "C"
+{
+
+void Java_app_usp_Emulator_InitRom(JNIEnv* env, jobject obj, jint rom_id, jobject rom_buf)
+{
+	const byte* rom = (const byte*)env->GetDirectBufferAddress(rom_buf);
+	switch(rom_id)
+	{
+	case 0:	memcpy(sos128_0,rom, sizeof(sos128_0));	break;
+	case 1:	memcpy(sos128_1,rom, sizeof(sos128_1));	break;
+	case 2:	memcpy(sos48,	rom, sizeof(sos48));	break;
+	case 3:	memcpy(service,	rom, sizeof(service));	break;
+	case 4:	memcpy(dos513f,	rom, sizeof(dos513f));	break;
+	}
+}
+
+void Java_app_usp_Emulator_InitFont(JNIEnv* env, jobject obj, jobject fnt_buf)
+{
+	const byte* fnt = (const byte*)env->GetDirectBufferAddress(fnt_buf);
+	memcpy(spxtrm4f, fnt, sizeof(spxtrm4f));
+}
+
+void Java_app_usp_Emulator_Init(JNIEnv* env, jobject obj, jstring jpath)
+{
+    const char* path = env->GetStringUTFChars(jpath, NULL);
+	xPlatform::Init(path);
+    env->ReleaseStringUTFChars(jpath, path);
+}
+void Java_app_usp_Emulator_Done(JNIEnv* env, jobject obj)
+{
+	xPlatform::Done();
+}
+
+jint Java_app_usp_Emulator_Update(JNIEnv* env, jobject obj)
+{
+	const char* err = xPlatform::Handler()->OnLoop();
+	if(!err)
+		return 0;
+	else if(!strcmp(err, "rzx_finished"))
+		return 1;
+	else if(!strcmp(err, "rzx_sync_lost"))
+		return 2;
+	else if(!strcmp(err, "rzx_invalid"))
+		return 3;
+	else if(!strcmp(err, "rzx_unsupported"))
+		return 4;
+	return -1;
+}
+
+static xPlatform::eGLES2* gles2 = NULL;
+static xPlatform::eGLES2Sprite* sprites[16];
+static int sprite_max = -1;
+
+void Java_app_usp_Emulator_GLInit(JNIEnv* env, jobject obj)
+{
+	gles2 = xPlatform::eGLES2::Create();
+}
+void Java_app_usp_Emulator_GLDone(JNIEnv* env, jobject obj)
+{
+	SAFE_DELETE(gles2);
+	for(int s = 0; s <= sprite_max; ++s)
+	{
+		SAFE_DELETE(sprites[s]);
+	}
+	sprite_max = -1;
+}
+void Java_app_usp_Emulator_GLDraw(JNIEnv* env, jobject obj, jint width, jint height)
+{
+	gles2->Draw(ZERO, ePoint(width, height));
+}
+jint Java_app_usp_Emulator_GLSpriteCreate(JNIEnv* env, jobject obj, jint width, jint height)
+{
+	if(++sprite_max >= 16)
+		return -1;
+	sprites[sprite_max] = new xPlatform::eGLES2Sprite(ePoint(width, height));
+	return sprite_max;
+}
+void Java_app_usp_Emulator_GLSpriteDraw(JNIEnv* env, jobject obj, jint handle, jint texture, jint pos_x, jint pos_y, jint width, jint height, jfloat alpha, jboolean filtering)
+{
+	if(handle < 0)
+		return;
+	if(!sprites[handle])
+		return;
+	sprites[handle]->Draw(texture, ePoint(pos_x, pos_y), ePoint(width, height), alpha, 1.0f, 1.0f, filtering);
+}
+void Java_app_usp_Emulator_GLSpriteSetColor(JNIEnv* env, jobject obj, jint handle, jfloat r, jfloat g, jfloat b)
+{
+	if(handle < 0)
+		return;
+	if(!sprites[handle])
+		return;
+	sprites[handle]->SetColor(r, g, b);
+}
+
+void Java_app_usp_Emulator_AudioInit(JNIEnv* env, jobject obj)
+{
+	xPlatform::InitSound();
+}
+void Java_app_usp_Emulator_AudioDone(JNIEnv* env, jobject obj)
+{
+	xPlatform::DoneSound();
+}
+
+jint Java_app_usp_Emulator_AudioUpdate(JNIEnv* env, jobject obj, jboolean skip_data)
+{
+	PROFILER_SECTION(u_aud);
+	return xPlatform::UpdateSound(skip_data);
+}
+
+void Java_app_usp_Emulator_OnKey(JNIEnv* env, jobject obj, jchar key, jboolean down, jboolean shift, jboolean alt)
+{
+	xPlatform::ProcessKey(key, down, shift, alt);
+}
+
+void Java_app_usp_Emulator_OnTouch(JNIEnv* env, jobject obj, jboolean keyboard, jfloat x, jfloat y, jboolean down, jint pointer_id)
+{
+	if(keyboard)
+		xPlatform::OnTouchKey(x, y, down, pointer_id);
+	else
+		xPlatform::OnTouchJoy(x, y, down, pointer_id);
+}
+
+void Java_app_usp_Emulator_VideoPaused(JNIEnv* env, jobject obj, jboolean on)
+{
+	xPlatform::Handler()->VideoPaused(on);
+}
+
+jboolean Java_app_usp_Emulator_Open(JNIEnv* env, jobject obj, jstring jfile)
+{
+    const char* file = env->GetStringUTFChars(jfile, NULL);
+    bool ok = xPlatform::Handler()->OnOpenFile(file);
+    env->ReleaseStringUTFChars(jfile, file);
+    return ok;
+}
+jboolean Java_app_usp_Emulator_OpenData(JNIEnv* env, jobject obj, jstring jfile, jobject file_data)
+{
+	const char* file = env->GetStringUTFChars(jfile, NULL);
+	void* buf = env->GetDirectBufferAddress(file_data);
+	auto size = env->GetDirectBufferCapacity(file_data);
+	bool ok = xPlatform::Handler()->OnOpenFile(file, buf, size);
+	env->ReleaseStringUTFChars(jfile, file);
+	return ok;
+}
+jstring Java_app_usp_Emulator_GetLastFile(JNIEnv* env, jobject obj)
+{
+	return env->NewStringUTF(xPlatform::OpLastFile());
+}
+
+void Java_app_usp_Emulator_LoadState(JNIEnv* env, jobject obj)
+{
+	using namespace xOptions;
+	eOptionB* o = eOptionB::Find("load state");
+	SAFE_CALL(o)->Change();
+}
+
+void Java_app_usp_Emulator_SaveState(JNIEnv* env, jobject obj)
+{
+	using namespace xOptions;
+	eOptionB* o = eOptionB::Find("save state");
+	SAFE_CALL(o)->Change();
+}
+void Java_app_usp_Emulator_SaveFile(JNIEnv* env, jobject obj)
+{
+	using namespace xOptions;
+	eOptionB* o = eOptionB::Find("save file");
+	SAFE_CALL(o)->Change();
+}
+void Java_app_usp_Emulator_StoreOptions(JNIEnv* env, jobject obj)
+{
+	xOptions::Store();
+}
+
+void Java_app_usp_Emulator_Reset(JNIEnv* env, jobject obj)
+{
+	xPlatform::Handler()->OnAction(xPlatform::A_RESET);
+}
+
+jint Java_app_usp_Emulator_GetOptionInt(JNIEnv* env, jobject obj, jstring jname)
+{
+    const char* name = env->GetStringUTFChars(jname, NULL);
+	int r = GetOption<int>(name);
+    env->ReleaseStringUTFChars(jname, name);
+    return r;
+}
+void Java_app_usp_Emulator_SetOptionInt(JNIEnv* env, jobject obj, jstring jname, jint value)
+{
+    const char* name = env->GetStringUTFChars(jname, NULL);
+	SetOption<int>(name, value);
+    env->ReleaseStringUTFChars(jname, name);
+}
+
+jboolean Java_app_usp_Emulator_GetOptionBool(JNIEnv* env, jobject obj, jstring jname)
+{
+    const char* name = env->GetStringUTFChars(jname, NULL);
+	int r = GetOption<bool>(name);
+    env->ReleaseStringUTFChars(jname, name);
+    return r;
+}
+void Java_app_usp_Emulator_SetOptionBool(JNIEnv* env, jobject obj, jstring jname, jboolean value)
+{
+    const char* name = env->GetStringUTFChars(jname, NULL);
+	SetOption<bool>(name, value);
+    env->ReleaseStringUTFChars(jname, name);
+}
+
+jint Java_app_usp_Emulator_TapeState(JNIEnv* env, jobject obj)
+{
+	using namespace xPlatform;
+	switch(Handler()->OnAction(A_TAPE_QUERY))
+	{
+	case AR_TAPE_NOT_INSERTED:	return 0;
+	case AR_TAPE_STOPPED:		return 1;
+	case AR_TAPE_STARTED:		return 2;
+	default:					break;
+	}
+	assert(0); // invalid tape query result
+	return 0;
+}
+void Java_app_usp_Emulator_TapeToggle(JNIEnv* env, jobject obj)
+{
+	xPlatform::Handler()->OnAction(xPlatform::A_TAPE_TOGGLE);
+}
+
+jboolean Java_app_usp_Emulator_DiskChanged(JNIEnv* env, jobject obj)
+{
+	using namespace xPlatform;
+	switch(Handler()->OnAction(A_DISK_QUERY))
+	{
+		case AR_DISK_NOT_CHANGED:	return false;
+		case AR_DISK_CHANGED:		return true;
+		default:					break;
+	}
+	assert(0); // invalid disk query result
+	return false;
+}
+
+jboolean Java_app_usp_Emulator_FileTypeSupported(JNIEnv* env, jobject obj, jstring jname)
+{
+    const char* name = env->GetStringUTFChars(jname, NULL);
+	bool r = xPlatform::Handler()->FileTypeSupported(name);
+    env->ReleaseStringUTFChars(jname, name);
+    return r;
+}
+
+jobject Java_app_usp_Emulator_ReplayProgress(JNIEnv* env, jobject obj)
+{
+	dword frame_current = 0, frames_total = 0, frames_cached = 0;
+	if(xPlatform::Handler()->GetReplayProgress(&frame_current, &frames_total, &frames_cached))
+	{
+		if(!frames_total)
+			return NULL;
+		jclass rpc = env->FindClass("app/usp/Emulator$ReplayProgress");
+		if(!rpc)
+			return NULL;
+		jfieldID fc = env->GetFieldID(rpc, "frame_current", "I");
+		if(!fc)
+			return NULL;
+		jfieldID ft = env->GetFieldID(rpc, "frames_total", "I");
+		if(!ft)
+			return NULL;
+		jfieldID fcc = env->GetFieldID(rpc, "frames_cached", "I");
+		if(!fcc)
+			return NULL;
+		jobject rpo = env->AllocObject(rpc);
+		if(!rpo)
+		    return NULL;
+		env->SetIntField(rpo, fc, frame_current);
+		env->SetIntField(rpo, ft, frames_total);
+		env->SetIntField(rpo, fcc, frames_cached);
+		return rpo;
+	}
+    return NULL;
+}
+
+jboolean Java_app_usp_Emulator_ReplayActive(JNIEnv* env, jobject obj)
+{
+	dword frame_current = 0, frames_total = 0, frames_cached = 0;
+	if(xPlatform::Handler()->GetReplayProgress(&frame_current, &frames_total, &frames_cached))
+	{
+		return frames_total > 0;
+	}
+	return false;
+}
+
+void Java_app_usp_Emulator_ProfilerBegin(JNIEnv* env, jobject obj, jint id)
+{
+	switch(id)
+	{
+	case 0: PROFILER_BEGIN(pro0);	break;
+	case 1: PROFILER_BEGIN(pro1);	break;
+	case 2: PROFILER_BEGIN(pro2);	break;
+	case 3: PROFILER_BEGIN(pro3);	break;
+	}
+}
+void Java_app_usp_Emulator_ProfilerEnd(JNIEnv* env, jobject obj, jint id)
+{
+	switch(id)
+	{
+	case 0: PROFILER_END(pro0);	break;
+	case 1: PROFILER_END(pro1);	break;
+	case 2: PROFILER_END(pro2);	break;
+	case 3: PROFILER_END(pro3);	break;
+	}
+}
+
+}
+//extern "C"
+
+#endif//_ANDROID

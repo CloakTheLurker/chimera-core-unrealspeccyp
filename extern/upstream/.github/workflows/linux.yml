@@ -1,0 +1,88 @@
+name: Linux
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  deb-ubuntu:
+    name: Deb (${{ matrix.runner }}) SDL2 GLESv2 curl
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential debhelper devscripts cmake pkg-config \
+            libsdl2-dev libcurl4-openssl-dev zlib1g-dev libpng-dev \
+            rsync
+
+      - name: Build .deb
+        run: |
+          chmod +x build/install/linux/make_deb.sh
+          OUTPUT_DIR="${GITHUB_WORKSPACE}/artifacts" \
+            ./build/install/linux/make_deb.sh
+
+      - name: Upload .deb
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-${{ matrix.runner }}
+          path: artifacts/*.deb
+          if-no-files-found: warn
+          archive: false
+
+  rpm-fedora:
+    name: RPM (Fedora ${{ matrix.arch }}) SDL2 GLESv2 curl
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: fedora:latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          dnf install -y \
+            rpm-build rpmdevtools cmake gcc-c++ make \
+            SDL2-devel libcurl-devel zlib-devel libpng-devel \
+            desktop-file-utils shared-mime-info libappstream-glib \
+            rsync git findutils
+
+      - name: Build .rpm
+        run: |
+          chmod +x build/install/fedora/make_rpm.sh
+          export RPMBUILD_DIR="${GITHUB_WORKSPACE}/rpmbuild"
+          export OUTPUT_DIR="${GITHUB_WORKSPACE}/artifacts"
+          mkdir -p "$RPMBUILD_DIR"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          mkdir -p "$OUTPUT_DIR"
+          ./build/install/fedora/make_rpm.sh
+
+      - name: Upload .rpm
+        uses: actions/upload-artifact@v7
+        with:
+          name: rpm-${{ matrix.arch }}
+          path: artifacts/unreal-speccy-portable-0*.${{ matrix.arch }}.rpm
+          if-no-files-found: warn
+          archive: false
+
+      - name: Upload debug .rpms
+        uses: actions/upload-artifact@v6
+        with:
+          name: unreal-speccy-portable-rpm-all-${{ matrix.arch }}.zip
+          path: artifacts/*.rpm
+          if-no-files-found: warn

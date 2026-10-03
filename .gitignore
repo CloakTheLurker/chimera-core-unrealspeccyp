@@ -1,0 +1,8 @@
+build/
+dist/
+*.o
+*.a
+*.so
+core.wbx
+*.zip
+.DS_Store

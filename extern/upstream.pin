@@ -1,0 +1,5 @@
+pin: UnrealSpeccyP-0.0.86.30
+source_tarball: cores/UnrealSpeccyP-0.0.86.30.tar.gz
+sha256: 8cc28f375c8cfb324fbe72f1f0d403d15f8c4b3c3622b008dcb8b0059fd79579
+upstream_url: https://github.com/djdron/UnrealSpeccyP
+seeded: extern/upstream is the tarball contents, verbatim, never edited in place

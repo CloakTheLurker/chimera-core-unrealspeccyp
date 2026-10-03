@@ -1,0 +1,18 @@
+{
+  "_comment": "Every component, its terms, its source link, its licence text reference. The bundle LICENSES.md is computed from this; a package declaring nothing stops the build.",
+  "licenses": [
+    {
+      "component": "UnrealSpeccyP (upstream emulation)",
+      "version": "0.0.86.30",
+      "source": "https://github.com/djdron/UnrealSpeccyP",
+      "license": "GPL-3.0-or-later",
+      "text": "extern/upstream/LICENSE"
+    },
+    {
+      "component": "chimera-core-unrealspeccyp adapter (waterbox/)",
+      "source": "https://github.com/ToolAssisted-run/chimera-core-unrealspeccyp",
+      "license": "GPL-3.0-or-later",
+      "text": "LICENSE"
+    }
+  ]
+}

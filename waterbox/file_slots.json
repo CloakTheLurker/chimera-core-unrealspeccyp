@@ -1,0 +1,6 @@
+{
+  "_comment": "What the project wizard asks for. The project IS the game; the machine ROM is firmware (one ROM serves every game). Slots to confirm against a booted machine at M2.",
+  "slots": [
+    {"id": "game", "title": "Spectrum software", "extensions": ["sna", "z80", "szx", "rzx", "tap", "tzx", "csw", "trd", "scl", "fdi", "td0", "udi", "zip"]}
+  ]
+}
