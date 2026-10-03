@@ -1,4 +1,8 @@
 // machine.cpp — thin eSpeccy wrapper. M0 only; M1 adds the virtual-time seam.
+//
+// NOTE: "std.h" must come first, like every upstream .cpp: the byte/dword/
+// qword types used throughout devices/ are declared by std_types.h via it.
+#include "std.h"
 #include "machine.h"
 #include "speccy.h"
 #include "devices/memory.h"

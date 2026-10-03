@@ -6,20 +6,24 @@
 # Copies Chimera Dev/chimera -> ~/chimera and
 # Chimera Dev/chimera-core-unrealspeccyp -> ~/chimera-core-unrealspeccyp,
 # then checks MINIBOX_DIR=~/chimera/extern/chimera-common-minibox.
+# .git is deliberately NOT synced: git objects are read-only, so a second
+# cp -a over them fails with Permission denied; the ~/ copies are build
+# trees, not repos (first seed copied .git once; history lives in
+# Chimera Dev). Everything else goes over verbatim with cp -a.
 # Run from anywhere; paths resolve from this script.
 set -eu
 HERE=$(dirname "$0")
 DEV=$(cd "$HERE/../.." && pwd -P)
 HOME_DIR="$HOME"
-CORE_SRC="$DEV/chimera-core-unrealspeccyp"
-CHIMERA_SRC="$DEV/chimera"
 
-echo "sync: $CHIMERA_SRC -> $HOME_DIR/chimera"
-mkdir -p "$HOME_DIR/chimera"
-cp -a "$CHIMERA_SRC/." "$HOME_DIR/chimera/"
-echo "sync: $CORE_SRC -> $HOME_DIR/chimera-core-unrealspeccyp"
-mkdir -p "$HOME_DIR/chimera-core-unrealspeccyp"
-cp -a "$CORE_SRC/." "$HOME_DIR/chimera-core-unrealspeccyp/"
+sync_tree() {
+  SRC="$1"; DST="$2"
+  echo "sync: $SRC -> $DST (cp -a, excluding .git)"
+  mkdir -p "$DST"
+  (cd "$SRC" && find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -a {} "$DST/" \;)
+}
+sync_tree "$DEV/chimera" "$HOME_DIR/chimera"
+sync_tree "$DEV/chimera-core-unrealspeccyp" "$HOME_DIR/chimera-core-unrealspeccyp"
 
 MINIBOX_DIR="$HOME_DIR/chimera/extern/chimera-common-minibox"
 if [ -f "$MINIBOX_DIR/meson.build" ]; then

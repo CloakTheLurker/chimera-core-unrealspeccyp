@@ -8,6 +8,7 @@
 // Audio/video pacing from platform/sdl2/* is deliberately absent: there is
 // no eTick, no SDL_Delay, no VideoPaused backpressure here.
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 int main(int argc, char** argv) {
