@@ -37,28 +37,12 @@ else
   RUN_CONTENT=""
 fi
 
-# Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL.
-# wsl_call wraps one WSL leg with kill-after-grace + retries: the 9P session
-# teardown stalls intermittently (tens of minutes), so a leg that cannot
-# finish must fail loudly. Guest-side work is resumable/idempotent, and
-# objects land atomically, so a retry continues where the kill left it.
-wsl_call() {
-  attempt=0
-  while [ $attempt -lt 3 ]; do
-    attempt=$((attempt+1))
-    if timeout -k 30 600 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null; then
-      return 0
-    fi
-    echo "gate: WSL leg $1 (attempt $attempt) failed — terminating Ubuntu and retrying" >&2
-    wsl.exe -t Ubuntu 2>/dev/null || true
-    sleep 10
-  done
-  echo "gate: WSL leg $1 failed 3 times" >&2
-  return 1
-}
+# Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL
+# (launch-and-poll through wsl-call.sh — see build-guest.sh for why).
 on_guest_host() {
   if [ "$(uname -s)" = "Linux" ]; then
-    sh "$ROOT/tools/wsl/$1" "$2"
+    mkdir -p "$ROOT/build/guest"
+    sh "$ROOT/tools/wsl/$1" "$2" 2>&1 | tee "$ROOT/build/guest/${1%.sh}.log"
   else
     if ! command -v wsl.exe >/dev/null 2>&1; then
       echo "gate: guest legs need Linux (or WSL with Ubuntu); neither found" >&2
@@ -66,7 +50,12 @@ on_guest_host() {
     fi
     export MSYS_NO_PATHCONV=1
     WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
-    wsl_call "$1" "$2"
+    . "$HERE/wsl-call.sh"
+    case "$1" in
+      check-wbx.sh) wsl_call "$1" "$2" "clean (no TLS" "$ROOT/build/guest/check-wbx.log" 300;;
+      guest-legs.sh) wsl_call "$1" "$2" "^run-wbx " "$ROOT/build/guest/guest-legs.log" 600;;
+      *) echo "gate: no marker for WSL leg $1" >&2; exit 1;;
+    esac
   fi
 }
 state_of() {
@@ -136,7 +125,9 @@ NV=$(field_of /tmp/gate_last.log run-native vhash)
 NB=$(field_of /tmp/gate_last.log run-native bhash)
 NM=$(field_of /tmp/gate_last.log run-native mhash)
 echo "gate leg m2-parity: native: $(summary_of)"
-on_guest_host guest-legs.sh 600 | tee /tmp/gate_wbx.log | sed -n 's/^run-wbx \(.*\)$/guest: \1/p'
+WBXLOG="$ROOT/build/guest/guest-legs.log"
+on_guest_host guest-legs.sh 600
+sed -n 's/^run-wbx \(.*\)$/guest: \1/p' "$WBXLOG" | tee /tmp/gate_wbx.log
 SG=$(field_of /tmp/gate_wbx.log guest state)
 GT=$(field_of /tmp/gate_wbx.log guest tstates)
 GV=$(field_of /tmp/gate_wbx.log guest vhash)
