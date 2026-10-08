@@ -59,25 +59,34 @@ GLIBS="-L$SYSROOT/lib -lstdc++ -lgcc -lgcc_eh -lc"
 # Same TU list as build-native.sh, plus the guest entry. C++ via g++, C via
 # musl-gcc (zlib is not C++-clean). -DWBX_GUEST enables the guest-only hooks.
 mkdir -p "$OUT/obj"
-rm -f "$OUT/obj/"*.o
+# Numbering is positional over a fixed TU order, so objects are resumable:
+# an .o newer than its source is kept. (A flag change needs rm obj/ by hand.)
 n=0
+compile_cxx() {
+  n=$((n+1))
+  if [ -f "$OUT/obj/g$n.o" ] && [ "$OUT/obj/g$n.o" -nt "$1" ]; then return 0; fi
+  echo "guest-link: [$n] $1"
+  # shellcheck disable=SC2086
+  g++ -std=c++17 -DWBX_GUEST -D_POSIX $GCXXFLAGS -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" -I"$CORE/waterbox" -c "$1" -o "$OUT/obj/g$n.o"
+}
+compile_c() {
+  n=$((n+1))
+  if [ -f "$OUT/obj/g$n.o" ] && [ "$OUT/obj/g$n.o" -nt "$1" ]; then return 0; fi
+  echo "guest-link: [$n] $1"
+  # shellcheck disable=SC2086
+  "$MUSL_GCC" -std=c11 -DWBX_GUEST -D_POSIX $GCFLAGS -I"$UP" -I"$UP/3rdparty/zlib" -c "$1" -o "$OUT/obj/g$n.o"
+}
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
   for f in "$UP/$d/"*.cpp; do
     [ -f "$f" ] || continue
-    n=$((n+1))
-    # shellcheck disable=SC2086
-    g++ -std=c++17 -DWBX_GUEST -D_POSIX $GCXXFLAGS -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" -I"$CORE/waterbox" -c "$f" -o "$OUT/obj/g$n.o"
+    compile_cxx "$f"
   done
 done
 for f in "$UP/3rdparty/tinyxml2/tinyxml2.cpp" "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp" "$CORE/waterbox/machine.cpp" "$CORE/waterbox/wbx-entry.cpp" "$CORE/waterbox/guest-syscalls.cpp"; do
-  n=$((n+1))
-  # shellcheck disable=SC2086
-  g++ -std=c++17 -DWBX_GUEST -D_POSIX $GCXXFLAGS -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" -I"$CORE/waterbox" -c "$f" -o "$OUT/obj/g$n.o"
+  compile_cxx "$f"
 done
 for f in "$UP/3rdparty/minizip/ioapi.c" "$UP/3rdparty/minizip/unzip.c" "$UP"/3rdparty/zlib/*.c; do
-  n=$((n+1))
-  # shellcheck disable=SC2086
-  "$MUSL_GCC" -std=c11 -DWBX_GUEST -D_POSIX $GCFLAGS -I"$UP" -I"$UP/3rdparty/zlib" -c "$f" -o "$OUT/obj/g$n.o"
+  compile_c "$f"
 done
 echo "guest-link: $n objects; linking core.wbx..."
 # shellcheck disable=SC2086

@@ -25,7 +25,6 @@ if [ ! -f "$MINIBOX_DIR/meson.build" ]; then
   exit 1
 fi
 
-"$HERE/apply-patches.sh"
 
 OUT="$ROOT/build/guest"
 if [ "$(uname -s)" = "Linux" ]; then
@@ -37,7 +36,7 @@ else
   fi
   export MSYS_NO_PATHCONV=1
   # msys /home/admin/X == C:\Users\admin\X == WSL /mnt/c/Users/admin/X.
-  WSLROOT=$(cd "$ROOT" && pwd -W | sed 's|^\([A-Za-z]\):|/mnt/\L\1|; s|\|/|g')
+  WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
   wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/guest-build.sh" < /dev/null
 fi
 echo "build-guest: $OUT/core.wbx"

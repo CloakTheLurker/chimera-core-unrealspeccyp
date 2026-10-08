@@ -47,7 +47,7 @@ on_guest_host() {
       exit 1
     fi
     export MSYS_NO_PATHCONV=1
-    WSLROOT=$(cd "$ROOT" && pwd -W | sed 's|^\([A-Za-z]\):|/mnt/\L\1|; s|\|/|g')
+    WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
     wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null
   fi
 }
