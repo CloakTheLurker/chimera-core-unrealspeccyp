@@ -14,11 +14,12 @@ HERE=$(dirname "$0")
 ROOT=$(cd "$HERE/.." && pwd -P)
 U="$ROOT/extern/upstream"
 OUT="$ROOT/build/native"
+UP="$ROOT/build/upstream-patched"
 OBJ="$OUT/obj"
 mkdir -p "$OUT" "$OBJ"
 rm -f "$OBJ"/*.o
 
-"$HERE/apply-patches.sh"
+"$HERE/apply-patches.sh" "$U" "$UP"
 
 CXX=${CXX:-g++}
 CC=${CC:-gcc}
@@ -26,27 +27,27 @@ CC=${CC:-gcc}
 # (Kept as a shell glob list, not cmake, so the headless constraint is visible.)
 CXXSRCS=""
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
-  for f in "$U/$d"/*.cpp; do
+  for f in "$UP/$d"/*.cpp; do
     [ -f "$f" ] && CXXSRCS="$CXXSRCS $f"
   done
 done
-CXXSRCS="$CXXSRCS $U/3rdparty/tinyxml2/tinyxml2.cpp"
+CXXSRCS="$CXXSRCS $UP/3rdparty/tinyxml2/tinyxml2.cpp"
 CXXSRCS="$CXXSRCS $HERE/machine.cpp $HERE/run-native.cpp"
-CSRCS="$U/3rdparty/minizip/ioapi.c $U/3rdparty/minizip/unzip.c"
+CSRCS="$UP/3rdparty/minizip/ioapi.c $UP/3rdparty/minizip/unzip.c"
 CFLAGS_ZLIB=""
 if [ -f /usr/include/zlib.h ]; then
   echo "build-native: system zlib found."
 else
   echo "build-native: no system zlib — using vendored 3rdparty/zlib (as upstream cmake does)."
-  for f in "$U"/3rdparty/zlib/*.c; do CSRCS="$CSRCS $f"; done
-  CFLAGS_ZLIB="-I$U/3rdparty/zlib"
+  for f in "$UP"/3rdparty/zlib/*.c; do CSRCS="$CSRCS $f"; done
+  CFLAGS_ZLIB="-I$UP/3rdparty/zlib"
 fi
-INCS="-I$U -I$U/3rdparty/minizip -I$U/3rdparty/tinyxml2 $CFLAGS_ZLIB"
+INCS="-I$UP -I$UP/3rdparty/minizip -I$UP/3rdparty/tinyxml2 $CFLAGS_ZLIB"
 
 echo "build-native: compiling C++ (M0 headless reference)..."
 # shellcheck disable=SC2086
 n=0
-for f in $CXXSRCS "$U/platform/platform.cpp" "$U/platform/io.cpp" "$U/platform/linux/io_select_linux.cpp"; do
+for f in $CXXSRCS "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp"; do
   n=$((n+1))
   $CXX -std=gnu++11 -O2 -DUSE_BENCHMARK -D_POSIX $INCS -c "$f" -o "$OBJ/cxx_$n.o"
 done
