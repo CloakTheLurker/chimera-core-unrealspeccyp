@@ -26,7 +26,7 @@ See `waterbox/package-licenses.json` and `extern/upstream/LICENSE`.
 
 - **M0 — skeleton + headless native build.** Upstream builds with no
   frontend, no host devices, no window system. `waterbox/build-native.sh`.
-- **M1 — virtual time.** One seam where the emulator asks the wall what time
+- **M1 — virtual time (DONE 2026-10-03, gate green).** The seam is the pacing layer (no wall clock in the machine); one seam where the emulator asks the wall what time
   it is; time bought with executed instructions, idle jumps to the next
   deadline. Gate leg stalls the host 300 ms and proves the machine did not
   notice (plus a negative control on the host clock).

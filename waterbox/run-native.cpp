@@ -1,32 +1,178 @@
-// run-native.cpp — the reference harness (M0).
+// run-native.cpp — the reference harness (M0 boot + M1 virtual time).
 //
-// Flags for every diagnostic the gate needs: --frames N steps N frames with
-// no wall clock (M1 proves a 300 ms host stall changes nothing);
-// --dump-video hashes the ULA framebuffer; --pull-audio drains the three
-// eDeviceSound sources the way the guest must; --trace-instr counts what the
-// machine executed so native-vs-guest compares the machine, not just pixels.
-// Audio/video pacing from platform/sdl2/* is deliberately absent: there is
-// no eTick, no SDL_Delay, no VideoPaused backpressure here.
+// Steps the machine with NO wall clock (--clock virtual, the default):
+// every frame is bought with executed instructions (71680 t-states), audio
+// is pulled at frame end in both flavors (pulling runs the machine's own
+// callbacks — the reference must pull too or native and guest diverge), and
+// video is hashed from the ULA framebuffer. Deliberately absent: eTick,
+// SDL_Delay-style pacing, VideoPaused backpressure (see usp_time.h).
+//
+// --clock host replays the SDL platform's wall coupling (pad to wall 20ms,
+// drop late machine frames) for the gate's negative control only.
+//
+// Firmware: the machine needs its ROMs (eRom::Init asserts/exits without
+// them). They ship in-tree at extern/upstream/res/rom/; --resdir overrides,
+// else resolved from argv[0] (<root>/build/native/run-native ->
+// <root>/extern/upstream/) with CWD fallbacks. M2 mounts firmware by name
+// in the guest; this native-only path just finds the files.
+//
+// Reports one machine-parseable line:
+//   run-native frames=N stepped=S dropped=D tstates=T vhash=H ahash=H
+//     state=H wall_ms=W vms=V clock=C file=F
+// state mixes video + audio + t-states + stepped count: the M1 legs compare
+// it across runs. vms is the VirtualClock reading (instruction-bought ms).
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "usp_time.h"
+#include "machine.h"
+#include "platform/io.h"
+
+static uint64_t fnv1a(const void* data, size_t len, uint64_t h) {
+  const unsigned char* p = (const unsigned char*)data;
+  while(len--) {
+    h ^= *p++;
+    h *= 1099511628211ULL;
+  }
+  return h;
+}
+static uint64_t mix_hash(uint64_t h, uint64_t v) {
+  h ^= v + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
+  return h;
+}
+
+static bool HasRoms(const char* dir) {
+  char p[4400];
+  snprintf(p, sizeof p, "%sres/rom/sos128_0.rom", dir);
+  FILE* f = fopen(p, "rb");
+  if(f)
+    fclose(f);
+  return f != NULL;
+}
+
+// Returns the resource dir (with trailing slash) or NULL when no ROMs found.
+static const char* FindResDir(const char* argv0, char* buf, size_t len) {
+  static char bindir[4096];
+  const char* slash = strrchr(argv0, '/');
+#ifdef _WIN32
+  const char* bslash = strrchr(argv0, '\');
+  if(bslash && (!slash || bslash > slash))
+    slash = bslash;
+#endif
+  if(slash) {
+    size_t n = (size_t)(slash - argv0);
+    if(n >= sizeof bindir)
+      n = sizeof bindir - 1;
+    memcpy(bindir, argv0, n);
+    bindir[n] = 0;
+  } else {
+    strcpy(bindir, ".");
+  }
+  snprintf(buf, len, "%s/../../extern/upstream/", bindir);
+  if(HasRoms(buf))
+    return buf;
+  if(HasRoms("extern/upstream/")) {
+    strcpy(buf, "extern/upstream/");
+    return buf;
+  }
+  if(HasRoms("./")) {
+    strcpy(buf, "./");
+    return buf;
+  }
+  return NULL;
+}
 
 int main(int argc, char** argv) {
-  const char* file = nullptr;
+  const char* file = NULL;
+  const char* resdir_override = NULL;
   int frames = 600;
-  bool dump_video = false, pull_audio = false, trace_instr = false;
-  for (int i = 1; i < argc; i++) {
-    if (!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
-    else if (!strcmp(argv[i], "--dump-video")) dump_video = true;
-    else if (!strcmp(argv[i], "--pull-audio")) pull_audio = true;
-    else if (!strcmp(argv[i], "--trace-instr")) trace_instr = true;
-    else if (!strcmp(argv[i], "--help")) {
-      printf("usage: run-native [--frames N] [--dump-video] [--pull-audio] [--trace-instr] <file>\n");
+  const char* clock = "virtual";
+  int stall_ms = 0;
+  int stall_at = -1;
+  bool trace = false;
+  for(int i = 1; i < argc; i++) {
+    if(!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--clock") && i + 1 < argc) clock = argv[++i];
+    else if(!strcmp(argv[i], "--stall-ms") && i + 1 < argc) stall_ms = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--stall-at") && i + 1 < argc) stall_at = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--resdir") && i + 1 < argc) resdir_override = argv[++i];
+    else if(!strcmp(argv[i], "--trace-instr")) trace = true;
+    else if(!strcmp(argv[i], "--dump-video")) {} // kept: video is always hashed (M1)
+    else if(!strcmp(argv[i], "--pull-audio")) {} // kept: audio is always pulled (M1)
+    else if(!strcmp(argv[i], "--help")) {
+      printf("usage: run-native [--frames N] [--clock virtual|host] [--stall-ms M --stall-at F] [--resdir D] [--trace-instr] [file]\n");
+      printf("  no file: firmware boot (Reset + step); file: eFileType-open then step.\n");
       return 0;
     } else file = argv[i];
   }
-  printf("run-native (M0 stub): file=%s frames=%d video=%d audio=%d instr=%d\n",
-      file ? file : "(none)", frames, dump_video, pull_audio, trace_instr);
-  printf("M0 wires this to eSpeccy via machine.cpp in build-native.sh.\n");
-  return file ? 0 : 1;
+  bool host = !strcmp(clock, "host");
+  if(strcmp(clock, "virtual") && !host) {
+    printf("run-native: unknown --clock %s (want virtual|host)\n", clock);
+    return 1;
+  }
+  if(stall_at < 0)
+    stall_at = frames / 2;
+
+  if(resdir_override) {
+    xIo::SetResourcePath(resdir_override);
+  } else {
+    static char resbuf[4096];
+    const char* found = FindResDir(argv[0], resbuf, sizeof resbuf);
+    if(!found) {
+      printf("run-native: firmware ROMs not found (tried <bindir>/../../extern/upstream/, extern/upstream/, ./); use --resdir\n");
+      return 1;
+    }
+    xIo::SetResourcePath(found);
+  }
+
+  Machine m;
+  m.Reset();
+  if(file) {
+    if(!m.OpenFile(file, NULL, 0)) {
+      printf("run-native: cannot open %s (unsupported format)\n", file);
+      return 1;
+    }
+  }
+
+  const uint64_t FNV_SEED = 1469598103934665603ULL;
+  uint64_t vhash = FNV_SEED, ahash = FNV_SEED;
+  VirtualClock vclock(0, m.FrameTacts(), 50);
+  FramePacer pacer(20);
+  if(host)
+    pacer.Start();
+  uint64_t t0 = usp_host_ms();
+  int stepped = 0;
+  for(int f = 0; f < frames; f++) {
+    if(stall_ms && f == stall_at)
+      usp_sleep_ms((unsigned)stall_ms); // host stalls; the machine must not notice
+    if(host && !pacer.Next())
+      continue; // DROP: wall-coupled catch-up skipped this machine frame
+    m.FrameAdvance();
+    ++stepped;
+    vclock.AdvanceFrames();
+    vhash = fnv1a(m.Video(), (size_t)Machine::VideoBytes(), vhash);
+    for(int s = 0; s < m.AudioSources(); s++) {
+      uint32_t r = m.AudioDataReady(s);
+      if(r)
+        ahash = fnv1a(m.AudioData(s), r, ahash);
+      m.AudioDataUse(s, r);
+    }
+    if(host)
+      pacer.Stepped();
+    if(trace && (f % 100 == 0))
+      printf("trace: frame=%d tstates=%llu\n", f, (unsigned long long)m.TStates());
+  }
+  uint64_t wall = usp_host_ms() - t0;
+  uint64_t state = vhash;
+  state = mix_hash(state, ahash);
+  state = mix_hash(state, m.TStates());
+  state = mix_hash(state, (uint64_t)stepped);
+  printf("run-native frames=%d stepped=%d dropped=%u tstates=%llu vhash=%016llx ahash=%016llx state=%016llx wall_ms=%llu vms=%llu clock=%s file=%s\n",
+      frames, stepped, host ? pacer.dropped() : 0,
+      (unsigned long long)m.TStates(),
+      (unsigned long long)vhash, (unsigned long long)ahash,
+      (unsigned long long)state,
+      (unsigned long long)wall, (unsigned long long)vclock.NowMs(),
+      clock, file ? file : "(firmware)");
+  return 0;
 }

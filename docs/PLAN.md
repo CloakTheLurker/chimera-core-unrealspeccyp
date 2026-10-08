@@ -61,7 +61,7 @@ with no SDL/GL/window linkage, and `run-native --help` plus a smoke run
 (`--frames N`, `--dump-video`, `--pull-audio`, `--trace-instr`) work on a
 snapshot/disk image.
 
-## M1 — virtual time (next)
+## M1 — virtual time (DONE 2026-10-03)
 
 Find the one place the emulator asks the wall what time it is and make it a
 seam. Time must be bought with executed instructions; idle must jump to the
@@ -90,6 +90,18 @@ prove the machine did not notice (identical instruction count / state hash
 with and without the stall); then run the same leg on the host clock and
 watch it fail. A leg never seen to fail is a leg not tested. Name the test
 content (exact file, glob fallback, print which ran).
+> Result (gate green): the audit found NO wall clock inside the machine —
+> eSpeccy/devices/Z80 timing is purely instruction-counted (t-states/frame,
+> TICK_F fixed-point audio resampling, tact-scheduled tape pulses). The only
+> wall clocks are the SDL platform pacing (eTick + SDL_Delay) and the audio-
+> drain backpressure that gates OnLoop via VideoPaused. So the seam
+> (waterbox/usp_time.h) is the pacing layer, not the machine: HostClock vs
+> VirtualClock (t_states-derived) plus a FramePacer mirroring the platform
+> coupling (pad to wall 20ms; DROP past 100ms lateness, else catch up by stepping unslept). The harness (run-native.cpp) pulls audio+video every
+> frame in both flavors; firmware ROMs resolve from in-tree res/rom via
+> --resdir or argv[0]. Legs: repeat equal, 300ms stall equal, --clock host
+> baseline clean (200/200 stepped, 0 drops) vs stalled 189/200 with 11 drops
+> and a different state — teeth confirmed.
 
 ## M2 — guest build (after M1)
 

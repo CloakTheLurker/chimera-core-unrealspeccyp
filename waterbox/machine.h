@@ -1,10 +1,12 @@
-// machine.h — the emulator, its clock, and the stepping loop (M0 thin wrapper).
+// machine.h — the emulator, its clock, and the stepping loop.
 //
 // Wraps eSpeccy (extern/upstream/speccy.h): construction builds the Pentagon
 // machine, Reset() re-inits devices, FrameAdvance() runs exactly one frame
 // via eSpeccy::Update(NULL), TStates() exposes the instruction-bought clock
-// M1 will seam. Video is the ULA framebuffer (eUla::Screen(), 320x240);
-// audio is pulled from the three eDeviceSound sources at frame end.
+// (M1 seam: VirtualClock in usp_time.h derives wall-independent time from it).
+// Video is the ULA framebuffer (eUla::Screen(), 320x240 INDEXED bytes — the
+// BGRA conversion for GetVideoBgra is M2 adapter work); audio is pulled from
+// the three eDeviceSound sources at frame end, in both flavors.
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -18,11 +20,16 @@ public:
   void Reset();
   void FrameAdvance();        // one 1/50s frame: eSpeccy::Update(NULL)
   uint64_t TStates() const;  // eSpeccy::T(): the virtual-time base
-  const void* Video() const; // eUla::Screen(), 320x240 32-bit pixels
+  uint32_t FrameTacts() const; // t-states per frame (71680 Pentagon)
+  const void* Video() const; // eUla::Screen(), 320x240 indexed bytes
   static int VideoWidth() { return 320; }
   static int VideoHeight() { return 240; }
+  static int VideoBytes() { return 320 * 240; }
   bool OpenFile(const char* path, const void* data, size_t size);
-  void PullAudio(int source, void* dst, uint32_t* inout_samples);
+  int AudioSources();                    // 3: beeper, AY, tape
+  const void* AudioData(int source);
+  uint32_t AudioDataReady(int source);   // bytes
+  void AudioDataUse(int source, uint32_t size);
   void SetButton(const char* name, bool held);
 private:
   eSpeccy* speccy;
