@@ -14,6 +14,9 @@
 wsl_call() {
   _script="$1"; _arg="$2"; _marker="$3"; _log="$4"; _deadline="$5"
   _attempt=0
+  # Absolute Windows paths: bare taskkill.exe is NOT on the msys PATH, and a
+  # missing killer turns the wait below into a hang (found the hard way).
+  _taskkill="/c/Windows/System32/taskkill.exe"
   while [ $_attempt -lt 3 ]; do
     _attempt=$((_attempt+1))
     rm -f "$_log"
@@ -40,7 +43,7 @@ wsl_call() {
         _elapsed=$((_elapsed+15))
         if grep -q "$_marker" "$_log" 2>/dev/null; then
           kill $_wpid 2>/dev/null || true
-          taskkill.exe /F /PID $_wpid 2>/dev/null || true
+          "$_taskkill" /F /PID $_wpid 2>/dev/null || true
           wait $_wpid 2>/dev/null || true
           return 0
         fi
@@ -54,7 +57,7 @@ wsl_call() {
     fi
     echo "wsl_call: terminating Ubuntu and retrying" >&2
     kill $_wpid 2>/dev/null || true
-    taskkill.exe /F /PID $_wpid 2>/dev/null || true
+    "$_taskkill" /F /PID $_wpid 2>/dev/null || true
     wait $_wpid 2>/dev/null || true
     wsl.exe -t Ubuntu 2>/dev/null || true
     sleep 10
