@@ -90,7 +90,12 @@ for f in "$UP/3rdparty/minizip/ioapi.c" "$UP/3rdparty/minizip/unzip.c" "$UP"/3rd
 done
 echo "guest-link: $n objects; linking core.wbx..."
 # shellcheck disable=SC2086
-g++ $GLDFLAGS -o "$OUT/core.wbx" "$OUT/obj/"g*.o "$CXXGLUE_OBJ" "$EMULIBC_OBJ" $GLIBS
+# The cxxflags ride the link line too (minibox tests/cpp recipe): the
+# musl-gcc specs reroute crt/startfiles/libgcc into the guest sysroot.
+# Without them the host glibc crt leaks in (multiple __dso_handle,
+# missing main, truncated relocations at the fixed base).
+# shellcheck disable=SC2086
+g++ $GCXXFLAGS $GLDFLAGS -o "$OUT/core.wbx" "$OUT/obj/"g*.o "$CXXGLUE_OBJ" "$EMULIBC_OBJ" $GLIBS
 echo "guest-link: hygiene (TLS/%fs/red-zone)..."
 sh "$MINIBOX/source/guest/check-wbx.sh" "$OUT/core.wbx"
 ls -la "$OUT/core.wbx"
