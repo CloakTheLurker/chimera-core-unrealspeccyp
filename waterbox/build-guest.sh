@@ -42,5 +42,13 @@ else
   WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
   . "$HERE/wsl-call.sh"
   wsl_call guest-build.sh "" "guest-link: .* done" "$OUT/guest-build.log" 1500
+  # The verified artifact lives in the ~/ build tree (WSL paths have no
+  # spaces; the invoking tree may). Copy it back so build-package.sh and
+  # local inspection see the exact binary the gate checked. (Linux builds
+  # link in-tree, so there is nothing to copy there.)
+  _wbx_home=~/chimera-core-unrealspeccyp/build/guest/core.wbx
+  if [ "$OUT/core.wbx" != "$_wbx_home" ] && [ -f "$_wbx_home" ]; then
+    cp -a "$_wbx_home" "$OUT/core.wbx"
+  fi
 fi
 echo "build-guest: $OUT/core.wbx"
