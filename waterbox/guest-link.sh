@@ -12,6 +12,8 @@ set -eu
 CORE="$1"; MINIBOX="$2"; OUT="$3"
 U="$CORE/extern/upstream"
 UP="$OUT/upstream-patched"
+stamp() { date "+guest-link: [%H:%M:%S] $1"; }
+stamp "start"
 sh "$CORE/waterbox/apply-patches.sh" "$U" "$UP"
 MB_BUILD="$MINIBOX/build/meson-linux"
 SYSROOT="$MB_BUILD/guest-sysroot"
@@ -33,6 +35,7 @@ if [ ! -f "$MB_BUILD/build.ninja" ]; then
 fi
 # NINJA may be "path/ninja with args": word-split intended.
 # shellcheck disable=SC2086
+stamp "toolchain check"
 $NINJA_BIN -C "$MB_BUILD" musl-gcc source/guest/emulibc.c.o source/guest/cxxglue.c.o libstdcxx-installed.stamp
 for f in "$MUSL_GCC" "$EMULIBC_OBJ" "$CXXGLUE_OBJ" "$LINKSCRIPT"; do
   if [ ! -f "$f" ]; then echo "guest-link: missing $f after toolchain build" >&2; exit 1; fi
@@ -90,6 +93,7 @@ done
 for f in "$UP/3rdparty/minizip/ioapi.c" "$UP/3rdparty/minizip/unzip.c" "$UP"/3rdparty/zlib/*.c; do
   compile_c "$f"
 done
+stamp "linking"
 echo "guest-link: $n objects; linking core.wbx..."
 # shellcheck disable=SC2086
 # The cxxflags ride the link line too (minibox tests/cpp recipe): the
@@ -98,6 +102,8 @@ echo "guest-link: $n objects; linking core.wbx..."
 # missing main, truncated relocations at the fixed base).
 # shellcheck disable=SC2086
 g++ $GCXXFLAGS $GLDFLAGS -o "$OUT/core.wbx" "$OUT/obj/"g*.o "$CXXGLUE_OBJ" "$EMULIBC_OBJ" $GLIBS
+stamp "hygiene"
 echo "guest-link: hygiene (TLS/%fs/red-zone)..."
 sh "$MINIBOX/source/guest/check-wbx.sh" "$OUT/core.wbx"
+stamp "done"
 ls -la "$OUT/core.wbx"
