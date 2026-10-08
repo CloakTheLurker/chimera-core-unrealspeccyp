@@ -41,7 +41,6 @@ if [ -n "$ZLIB_SRCS" ]; then
   set -- "$@" -I"$UP/3rdparty/zlib"
 fi
 
-echo "build-native: compiling (M0 headless reference)..."
 I1="-I$UP"; I2="-I$UP/3rdparty/minizip"; I3="-I$UP/3rdparty/tinyxml2"; I4=""
 if [ -n "$ZLIB_SRCS" ]; then
   I4="-I$UP/3rdparty/zlib"
@@ -52,14 +51,15 @@ n=0
 compile_cxx() {
   n=$((n+1))
   if [ -f "$OBJ/cxx_$n.o" ] && [ "$OBJ/cxx_$n.o" -nt "$1" ]; then return 0; fi
-  "$CXX" -std=gnu++11 -O2 -DUSE_BENCHMARK -D_POSIX "$I1" "$I2" "$I3" ${I4:+"$I4"} -c "$1" -o "$OBJ/cxx_$n.o"
+  # Atomic landing (.tmp + mv): a KILLed compiler must never leave a
+  # partial .o newer than its source, or the resume check would bless it.
+  "$CXX" -std=gnu++11 -O2 -DUSE_BENCHMARK -D_POSIX "$I1" "$I2" "$I3" ${I4:+"$I4"} -c "$1" -o "$OBJ/cxx_$n.o.tmp" && mv "$OBJ/cxx_$n.o.tmp" "$OBJ/cxx_$n.o"
 }
 compile_c() {
   n=$((n+1))
   if [ -f "$OBJ/c_$n.o" ] && [ "$OBJ/c_$n.o" -nt "$1" ]; then return 0; fi
-  "$CC" -O2 -D_POSIX "$I1" ${I4:+"$I4"} -c "$1" -o "$OBJ/c_$n.o"
+  "$CC" -O2 -D_POSIX "$I1" ${I4:+"$I4"} -c "$1" -o "$OBJ/c_$n.o.tmp" && mv "$OBJ/c_$n.o.tmp" "$OBJ/c_$n.o"
 }
-# M0 source list mirrors the usp build/cmake core globs minus every UI/platform.
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
   for f in "$UP/$d/"*.cpp; do
     [ -f "$f" ] || continue

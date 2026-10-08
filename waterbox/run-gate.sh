@@ -38,10 +38,22 @@ else
 fi
 
 # Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL.
-# Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL.
-# WSL calls carry a timeout: a wedged WSL session must fail the leg loudly,
-# not hang the gate (stale wsl.exe clients have been observed to block
-# forever on session start; clear with taskkill /F /IM wsl.exe).
+# wsl_call wraps one WSL leg with kill-after-grace + retries: the 9P session
+# teardown stalls intermittently (tens of minutes), so a leg that cannot
+# finish must fail loudly. Guest-side work is resumable/idempotent, and
+# objects land atomically, so a retry continues where the kill left it.
+wsl_call() {
+  attempt=0
+  while [ $attempt -lt 3 ]; do
+    attempt=$((attempt+1))
+    if timeout -k 30 600 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null; then
+      return 0
+    fi
+    echo "gate: WSL leg $1 (attempt $attempt) failed — retrying" >&2
+  done
+  echo "gate: WSL leg $1 failed 3 times" >&2
+  return 1
+}
 on_guest_host() {
   if [ "$(uname -s)" = "Linux" ]; then
     sh "$ROOT/tools/wsl/$1" "$2"
@@ -52,10 +64,9 @@ on_guest_host() {
     fi
     export MSYS_NO_PATHCONV=1
     WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
-    timeout 1500 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null
+    wsl_call "$1" "$2"
   fi
 }
-
 state_of() {
   # state_of <run-native args...>: prints the state= hex of the summary line
   "$NATIVE" "$@" $RUN_CONTENT | tee /tmp/gate_last.log | sed -n 's/^run-native .* state=\([0-9a-f]*\) .*$/\1/p'

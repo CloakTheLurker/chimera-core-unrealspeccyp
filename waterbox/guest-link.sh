@@ -66,15 +66,17 @@ compile_cxx() {
   n=$((n+1))
   if [ -f "$OUT/obj/g$n.o" ] && [ "$OUT/obj/g$n.o" -nt "$1" ]; then return 0; fi
   echo "guest-link: [$n] $1"
+  # Objects land atomically (.tmp + mv): a KILLed compiler must never leave
+  # a partial .o newer than its source, or the resume check would bless it.
   # shellcheck disable=SC2086
-  g++ -std=c++17 -DWBX_GUEST -D_POSIX $GCXXFLAGS -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" -I"$CORE/waterbox" -c "$1" -o "$OUT/obj/g$n.o"
+  g++ -std=c++17 -DWBX_GUEST -D_POSIX $GCXXFLAGS -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" -I"$CORE/waterbox" -c "$1" -o "$OUT/obj/g$n.o.tmp" && mv "$OUT/obj/g$n.o.tmp" "$OUT/obj/g$n.o"
 }
 compile_c() {
   n=$((n+1))
   if [ -f "$OUT/obj/g$n.o" ] && [ "$OUT/obj/g$n.o" -nt "$1" ]; then return 0; fi
   echo "guest-link: [$n] $1"
   # shellcheck disable=SC2086
-  "$MUSL_GCC" -std=c11 -DWBX_GUEST -D_POSIX $GCFLAGS -I"$UP" -I"$UP/3rdparty/zlib" -c "$1" -o "$OUT/obj/g$n.o"
+  "$MUSL_GCC" -std=c11 -DWBX_GUEST -D_POSIX $GCFLAGS -I"$UP" -I"$UP/3rdparty/zlib" -c "$1" -o "$OUT/obj/g$n.o.tmp" && mv "$OUT/obj/g$n.o.tmp" "$OUT/obj/g$n.o"
 }
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
   for f in "$UP/$d/"*.cpp; do

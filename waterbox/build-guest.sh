@@ -37,8 +37,21 @@ else
   export MSYS_NO_PATHCONV=1
   # msys /home/admin/X == C:\Users\admin\X == WSL /mnt/c/Users/admin/X.
   WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
-  # 25-minute timeout: a wedged WSL session must fail loudly, not hang.
-  # guest-link.sh itself is resumable; re-run to continue.
-  timeout 1500 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/guest-build.sh" < /dev/null
+  # Kill-after-grace + retries: the 9P session teardown stalls
+  # intermittently. Cap is 25 min (a healthy from-scratch link needs ~15);
+  # guest-link.sh is resumable and objects land atomically, so a retry
+  # continues where the kill left it.
+  attempt=0
+  while [ $attempt -lt 3 ]; do
+    attempt=$((attempt+1))
+    if timeout -k 60 1500 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/guest-build.sh" < /dev/null; then
+      break
+    fi
+    echo "build-guest: WSL attempt $attempt failed — retrying" >&2
+    if [ $attempt -ge 3 ]; then
+      echo "build-guest: WSL failed 3 times" >&2
+      exit 1
+    fi
+  done
 fi
 echo "build-guest: $OUT/core.wbx"
