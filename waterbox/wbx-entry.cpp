@@ -20,7 +20,7 @@
 #include <emulibc.h>
 
 static Machine* g_machine = 0;
-static uint32_t g_bgra[Machine::VideoWidth() * Machine::VideoHeight()];
+static uint32_t g_bgra[320 * 240]; // == Machine::VideoWidth() * Machine::VideoHeight() (a static call is not a constant-expression)
 static int16_t g_audio[2048]; // > one frame (882 pairs) with headroom
 
 ECL_EXPORT bool Init(void) {
