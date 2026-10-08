@@ -103,9 +103,26 @@ content (exact file, glob fallback, print which ran).
 > baseline clean (200/200 stepped, 0 drops) vs stalled 189/200 with 11 drops
 > and a different state — teeth confirmed.
 
-## M2 — guest build (IN PROGRESS)
+## M2 — guest build (DONE 2026-10-08)
 
 The emulator through the musl guest toolchain, linked into `core.wbx`.
+> DONE: gate green end to end (run-gate.sh EXIT=0). core.wbx (670KB)
+> links through the musl + guest-libstdc++ toolchain at 0x36f00000000,
+> passes miniBox check-wbx.sh (no TLS, no %fs, nothing below rsp), and the
+> parity leg holds bit-identical: native vs guest agree on tstates (43008000),
+> vhash, bhash, mhash and state (9a27884bfbb37739) over 600 firmware frames.
+> No guest traps fired: no TLS/RTTI/exceptions/threads in the TU list, no
+> syscall gaps on the firmware-boot path (fopen/fread on mounts works),
+> static constructors (audio filter tables) run in the guest. Hard-won
+> environment lessons (all in the scripts now): meson marks guest-toolchain
+> targets build_by_default=false (ask by name); partial GCC/tar states from
+> killed runs need repair (tools/wsl/fix-gcc-src.sh, pre-verified fetch);
+> patches apply onto a marker-skipped build copy (CRLF-normalized); the link
+> needs the musl specs on the link line (host crt leaks in otherwise);
+> wsl.exe intermittently never exits after its script finishes — WSL legs go
+> through wsl-call.sh (launch-and-poll on a log marker, absolute taskkill
+> path, no msys wait on Windows PIDs) and objects land atomically so kills
+> are resumable.
 > Progress: the guest link runs on Linux — natively on CI, inside WSL Ubuntu
 > from a Windows checkout (meson 1.7 + ninja bootstrapped user-local, no
 > root). miniBox's own suite is the foundation gate (`meson test`: musl +

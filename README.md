@@ -30,8 +30,10 @@ See `waterbox/package-licenses.json` and `extern/upstream/LICENSE`.
   it is; time bought with executed instructions, idle jumps to the next
   deadline. Gate leg stalls the host 300 ms and proves the machine did not
   notice (plus a negative control on the host clock).
-- **M2 — guest build.** Same emulator through the musl guest toolchain into
-  `core.wbx`. `MINIBOX_DIR=~/chimera/extern/chimera-common-minibox`
+- **M2 — guest build (DONE 2026-10-08, gate green).** Same emulator through
+  the musl guest toolchain into `core.wbx` (670KB, hygiene-clean, bit-identical
+  parity with native over 600 firmware frames).
+  `MINIBOX_DIR=~/chimera/extern/chimera-common-minibox`
   (passed down from `build-package.sh`; never guessed from `$HOME`).
 
 ## Editing vs building
