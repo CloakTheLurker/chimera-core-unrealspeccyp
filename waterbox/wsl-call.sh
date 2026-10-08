@@ -20,23 +20,39 @@ wsl_call() {
     export MSYS_NO_PATHCONV=1
     wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$_script" "$_arg" < /dev/null > "$_log" 2>&1 &
     _wpid=$!
-    _elapsed=0
-    while [ $_elapsed -lt $_deadline ]; do
-      sleep 15
-      _elapsed=$((_elapsed+15))
-      if grep -q "$_marker" "$_log" 2>/dev/null; then
-        kill $_wpid 2>/dev/null || true
-        taskkill.exe /F /PID $_wpid 2>/dev/null || true
-        wait $_wpid 2>/dev/null || true
-        return 0
-      fi
-      if ! kill -0 $_wpid 2>/dev/null; then
-        wait $_wpid; _code=$?
-        echo "wsl_call: $_script exited $_code without marker (attempt $_attempt)" >&2
-        break
-      fi
+    # Liveness first: a healthy session logs within ~60s (ninja check, patch
+    # lines). A wedged session-start logs nothing — fail it fast (2 min),
+    # not after the whole deadline.
+    _lived=0
+    _waited=0
+    while [ $_waited -lt 120 ]; do
+      sleep 10
+      _waited=$((_waited+10))
+      if [ -s "$_log" ]; then _lived=1; break; fi
+      if ! kill -0 $_wpid 2>/dev/null; then break; fi
     done
-    echo "wsl_call: $_script no marker after ${_deadline}s (attempt $_attempt) — terminating Ubuntu and retrying" >&2
+    if [ $_lived -eq 0 ]; then
+      echo "wsl_call: $_script produced no output in 120s (attempt $_attempt) — wedged session?" >&2
+    else
+      _elapsed=0
+      while [ $_elapsed -lt $_deadline ]; do
+        sleep 15
+        _elapsed=$((_elapsed+15))
+        if grep -q "$_marker" "$_log" 2>/dev/null; then
+          kill $_wpid 2>/dev/null || true
+          taskkill.exe /F /PID $_wpid 2>/dev/null || true
+          wait $_wpid 2>/dev/null || true
+          return 0
+        fi
+        if ! kill -0 $_wpid 2>/dev/null; then
+          wait $_wpid; _code=$?
+          echo "wsl_call: $_script exited $_code without marker (attempt $_attempt)" >&2
+          break
+        fi
+      done
+      echo "wsl_call: $_script no marker after ${_deadline}s (attempt $_attempt)" >&2
+    fi
+    echo "wsl_call: terminating Ubuntu and retrying" >&2
     kill $_wpid 2>/dev/null || true
     taskkill.exe /F /PID $_wpid 2>/dev/null || true
     wait $_wpid 2>/dev/null || true
