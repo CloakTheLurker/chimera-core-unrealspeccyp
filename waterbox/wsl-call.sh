@@ -42,14 +42,15 @@ wsl_call() {
         sleep 15
         _elapsed=$((_elapsed+15))
         if grep -q "$_marker" "$_log" 2>/dev/null; then
+          # No wait(1) here by design: msys wait on a Windows PID blocks
+          # indefinitely when the client is wedged in session teardown
+          # (taskkill already reaped it — tasklist stays clean).
           kill $_wpid 2>/dev/null || true
           "$_taskkill" /F /PID $_wpid 2>/dev/null || true
-          wait $_wpid 2>/dev/null || true
           return 0
         fi
         if ! kill -0 $_wpid 2>/dev/null; then
-          wait $_wpid; _code=$?
-          echo "wsl_call: $_script exited $_code without marker (attempt $_attempt)" >&2
+          echo "wsl_call: $_script client gone without marker (attempt $_attempt)" >&2
           break
         fi
       done
@@ -58,7 +59,6 @@ wsl_call() {
     echo "wsl_call: terminating Ubuntu and retrying" >&2
     kill $_wpid 2>/dev/null || true
     "$_taskkill" /F /PID $_wpid 2>/dev/null || true
-    wait $_wpid 2>/dev/null || true
     wsl.exe -t Ubuntu 2>/dev/null || true
     sleep 10
   done
