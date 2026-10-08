@@ -127,7 +127,7 @@ NM=$(field_of /tmp/gate_last.log run-native mhash)
 echo "gate leg m2-parity: native: $(summary_of)"
 WBXLOG="$ROOT/build/guest/guest-legs.log"
 on_guest_host guest-legs.sh 600
-sed -n 's/^run-wbx \(.*\)$/guest: \1/p' "$WBXLOG" | tee /tmp/gate_wbx.log
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 SG=$(field_of /tmp/gate_wbx.log guest state)
 GT=$(field_of /tmp/gate_wbx.log guest tstates)
 GV=$(field_of /tmp/gate_wbx.log guest vhash)
