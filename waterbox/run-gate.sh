@@ -49,7 +49,9 @@ wsl_call() {
     if timeout -k 30 600 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null; then
       return 0
     fi
-    echo "gate: WSL leg $1 (attempt $attempt) failed — retrying" >&2
+    echo "gate: WSL leg $1 (attempt $attempt) failed — terminating Ubuntu and retrying" >&2
+    wsl.exe -t Ubuntu 2>/dev/null || true
+    sleep 10
   done
   echo "gate: WSL leg $1 failed 3 times" >&2
   return 1
