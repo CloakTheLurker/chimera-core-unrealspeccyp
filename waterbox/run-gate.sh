@@ -38,6 +38,10 @@ else
 fi
 
 # Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL.
+# Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL.
+# WSL calls carry a timeout: a wedged WSL session must fail the leg loudly,
+# not hang the gate (stale wsl.exe clients have been observed to block
+# forever on session start; clear with taskkill /F /IM wsl.exe).
 on_guest_host() {
   if [ "$(uname -s)" = "Linux" ]; then
     sh "$ROOT/tools/wsl/$1" "$2"
@@ -48,7 +52,7 @@ on_guest_host() {
     fi
     export MSYS_NO_PATHCONV=1
     WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
-    wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null
+    timeout 1500 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$1" "$2" < /dev/null
   fi
 }
 

@@ -37,6 +37,8 @@ else
   export MSYS_NO_PATHCONV=1
   # msys /home/admin/X == C:\Users\admin\X == WSL /mnt/c/Users/admin/X.
   WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
-  wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/guest-build.sh" < /dev/null
+  # 25-minute timeout: a wedged WSL session must fail loudly, not hang.
+  # guest-link.sh itself is resumable; re-run to continue.
+  timeout 1500 wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/guest-build.sh" < /dev/null
 fi
 echo "build-guest: $OUT/core.wbx"
