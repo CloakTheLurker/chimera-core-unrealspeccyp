@@ -46,3 +46,31 @@ void Machine::AudioDataUse(int source, uint32_t size) { SoundDev(speccy, source)
 void Machine::SetButton(const char* /*name*/, bool /*held*/) {
   // M2: levels, not events — the host says what is held this frame.
 }
+
+// MixedAudio: sum the three sources per sample like eSoundMixer::Update
+// (tools/sound_mixer.cpp: int sums of the three int32 streams), clamped to
+// int16 stereo pairs. min-ready across sources, then drain all — identical
+// in native and guest, so the parity leg compares one mix.
+uint32_t Machine::MixedAudio(int16_t* stereo, uint32_t capacity) {
+  uint32_t ready0 = AudioDataReady(0) / 4;
+  uint32_t ready1 = AudioDataReady(1) / 4;
+  uint32_t ready2 = AudioDataReady(2) / 4;
+  uint32_t n = ready0;
+  if(ready1 < n) n = ready1;
+  if(ready2 < n) n = ready2;
+  if(n * 2 > capacity) n = capacity / 2;
+  const int32_t* s0 = (const int32_t*)AudioData(0);
+  const int32_t* s1 = (const int32_t*)AudioData(1);
+  const int32_t* s2 = (const int32_t*)AudioData(2);
+  for(uint32_t i = 0; i < n; i++) {
+    int32_t v = s0[i] + s1[i] + s2[i];
+    if(v > 32767) v = 32767;
+    if(v < -32768) v = -32768;
+    stereo[i * 2] = (int16_t)v;      // mono machine: same on both channels
+    stereo[i * 2 + 1] = (int16_t)v;
+  }
+  AudioDataUse(0, AudioDataReady(0));
+  AudioDataUse(1, AudioDataReady(1));
+  AudioDataUse(2, AudioDataReady(2));
+  return n * 2;
+}

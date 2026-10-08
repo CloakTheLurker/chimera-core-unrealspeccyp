@@ -17,15 +17,20 @@
 // in the guest; this native-only path just finds the files.
 //
 // Reports one machine-parseable line:
-//   run-native frames=N stepped=S dropped=D tstates=T vhash=H ahash=H
-//     state=H wall_ms=W vms=V clock=C file=F
-// state mixes video + audio + t-states + stepped count: the M1 legs compare
-// it across runs. vms is the VirtualClock reading (instruction-bought ms).
+//   run-native frames=N stepped=S dropped=D tstates=T vhash=H bhash=H
+//     mhash=H ahash=H state=H wall_ms=W vms=V clock=C file=F
+// vhash covers the raw indexed framebuffer, bhash the BGRA conversion
+// (palette.h — the same function the guest uses), mhash the mixed stereo
+// (Machine::MixedAudio — the same function the guest GetAudio uses),
+// ahash the three raw source streams (native-only diagnostic). state mixes
+// vhash + bhash + mhash + t-states + stepped: the parity leg compares it
+// across flavors. vms is the VirtualClock reading (instruction-bought ms).
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include "usp_time.h"
 #include "machine.h"
+#include "palette.h"
 #include "platform/io.h"
 
 static uint64_t fnv1a(const void* data, size_t len, uint64_t h) {
@@ -135,7 +140,10 @@ int main(int argc, char** argv) {
   }
 
   const uint64_t FNV_SEED = 1469598103934665603ULL;
-  uint64_t vhash = FNV_SEED, ahash = FNV_SEED;
+  uint64_t vhash = FNV_SEED, bhash = FNV_SEED;
+  uint64_t mhash = FNV_SEED, ahash = FNV_SEED;
+  static uint32_t bgra[320 * 240];
+  static int16_t mixed[2048];
   VirtualClock vclock(0, m.FrameTacts(), 50);
   FramePacer pacer(20);
   if(host)
@@ -150,13 +158,18 @@ int main(int argc, char** argv) {
     m.FrameAdvance();
     ++stepped;
     vclock.AdvanceFrames();
-    vhash = fnv1a(m.Video(), (size_t)Machine::VideoBytes(), vhash);
+    const uint8_t* raw = (const uint8_t*)m.Video();
+    vhash = fnv1a(raw, (size_t)Machine::VideoBytes(), vhash);
+    usp_framebuffer_to_bgra(raw, bgra, Machine::VideoBytes());
+    bhash = fnv1a(bgra, sizeof bgra, bhash);
     for(int s = 0; s < m.AudioSources(); s++) {
       uint32_t r = m.AudioDataReady(s);
       if(r)
         ahash = fnv1a(m.AudioData(s), r, ahash);
-      m.AudioDataUse(s, r);
     }
+    uint32_t wrote = m.MixedAudio(mixed, 2048); // drains the sources
+    if(wrote)
+      mhash = fnv1a(mixed, wrote * sizeof(int16_t), mhash);
     if(host)
       pacer.Stepped();
     if(trace && (f % 100 == 0))
@@ -164,13 +177,15 @@ int main(int argc, char** argv) {
   }
   uint64_t wall = usp_host_ms() - t0;
   uint64_t state = vhash;
-  state = mix_hash(state, ahash);
+  state = mix_hash(state, bhash);
+  state = mix_hash(state, mhash);
   state = mix_hash(state, m.TStates());
   state = mix_hash(state, (uint64_t)stepped);
-  printf("run-native frames=%d stepped=%d dropped=%u tstates=%llu vhash=%016llx ahash=%016llx state=%016llx wall_ms=%llu vms=%llu clock=%s file=%s\n",
+  printf("run-native frames=%d stepped=%d dropped=%u tstates=%llu vhash=%016llx bhash=%016llx mhash=%016llx ahash=%016llx state=%016llx wall_ms=%llu vms=%llu clock=%s file=%s\n",
       frames, stepped, host ? pacer.dropped() : 0,
       (unsigned long long)m.TStates(),
-      (unsigned long long)vhash, (unsigned long long)ahash,
+      (unsigned long long)vhash, (unsigned long long)bhash,
+      (unsigned long long)mhash, (unsigned long long)ahash,
       (unsigned long long)state,
       (unsigned long long)wall, (unsigned long long)vclock.NowMs(),
       clock, file ? file : "(firmware)");

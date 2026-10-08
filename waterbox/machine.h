@@ -4,9 +4,9 @@
 // machine, Reset() re-inits devices, FrameAdvance() runs exactly one frame
 // via eSpeccy::Update(NULL), TStates() exposes the instruction-bought clock
 // (M1 seam: VirtualClock in usp_time.h derives wall-independent time from it).
-// Video is the ULA framebuffer (eUla::Screen(), 320x240 INDEXED bytes — the
-// BGRA conversion for GetVideoBgra is M2 adapter work); audio is pulled from
-// the three eDeviceSound sources at frame end, in both flavors.
+// Video is the ULA framebuffer (eUla::Screen(), 320x240 INDEXED bytes —
+// palette.h converts to BGRA identically in both flavors); audio is pulled
+// from the three eDeviceSound sources at frame end, in both flavors.
 #pragma once
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +30,10 @@ public:
   const void* AudioData(int source);
   uint32_t AudioDataReady(int source);   // bytes
   void AudioDataUse(int source, uint32_t size);
+  // Mixes all sources to int16 stereo (same function the guest GetAudio
+  // uses; the native parity hash covers it too). Drains the sources.
+  // Returns int16 elements written (<= capacity).
+  uint32_t MixedAudio(int16_t* stereo, uint32_t capacity);
   void SetButton(const char* name, bool held);
 private:
   eSpeccy* speccy;

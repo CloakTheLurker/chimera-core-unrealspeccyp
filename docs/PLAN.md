@@ -103,9 +103,22 @@ content (exact file, glob fallback, print which ran).
 > baseline clean (200/200 stepped, 0 drops) vs stalled 189/200 with 11 drops
 > and a different state — teeth confirmed.
 
-## M2 — guest build (after M1)
+## M2 — guest build (IN PROGRESS)
 
 The emulator through the musl guest toolchain, linked into `core.wbx`.
+> Progress: the guest link runs on Linux — natively on CI, inside WSL Ubuntu
+> from a Windows checkout (meson 1.7 + ninja bootstrapped user-local, no
+> root). miniBox's own suite is the foundation gate (`meson test`: musl +
+> guest libstdc++ + conformance/thread/cpp guests). Notable: meson marks the
+> guest-toolchain custom targets build_by_default=false, so plain `ninja`
+> builds only the host — guest-link.sh asks for musl-gcc/emulibc/cxxglue/
+> libstdcxx by name. Core-side audit is clean: no throw/threads/iostream/
+> RTTI in the guest TU list (only excluded platform files). Entry surface is
+> Init()/FrameAdvance/GetVideoBgra/GetVideoRaw/GetAudio/GetAudioBuf/
+> GetTStates/GetVsync*; firmware arrives as mounts under bare IDs via patch
+> 001 (WBX_GUEST-only hook); input levels are M-later (signature already
+> final). Parity vector (tstates/vhash/bhash/mhash/state) is computed by the
+> same functions in both flavors (palette.h, Machine::MixedAudio).
 
 - Toolchain comes from `MINIBOX_DIR`
   (`~/chimera/extern/chimera-common-minibox`), passed down from

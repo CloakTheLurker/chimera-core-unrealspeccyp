@@ -9,7 +9,8 @@
 # .git is deliberately NOT synced: git objects are read-only, so a second
 # cp -a over them fails with Permission denied; the ~/ copies are build
 # trees, not repos (first seed copied .git once; history lives in
-# Chimera Dev). Everything else goes over verbatim with cp -a.
+# Chimera Dev). cp -au (update: skip unchanged) keeps build trees of
+# gigabytes syncing in seconds instead of re-copying everything.
 # Run from anywhere; paths resolve from this script.
 set -eu
 HERE=$(dirname "$0")
@@ -18,9 +19,9 @@ HOME_DIR="$HOME"
 
 sync_tree() {
   SRC="$1"; DST="$2"
-  echo "sync: $SRC -> $DST (cp -a, excluding .git)"
+  echo "sync: $SRC -> $DST (cp -au, excluding .git)"
   mkdir -p "$DST"
-  (cd "$SRC" && find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -a {} "$DST/" \;)
+  (cd "$SRC" && find . -mindepth 1 -maxdepth 1 ! -name '.git' -exec cp -au {} "$DST/" \;)
 }
 sync_tree "$DEV/chimera" "$HOME_DIR/chimera"
 sync_tree "$DEV/chimera-core-unrealspeccyp" "$HOME_DIR/chimera-core-unrealspeccyp"

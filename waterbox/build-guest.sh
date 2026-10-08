@@ -1,12 +1,18 @@
 #!/bin/sh
-# build-guest.sh — M2: the emulator through the musl guest toolchain.
+# build-guest.sh — the emulator through the musl guest toolchain into core.wbx.
 #
 # Requires MINIBOX_DIR (the chimera-common-minibox checkout the core builds
-# against). It is passed down from build-package.sh; this script stops with a
-# message if it is absent. No $HOME guessing, no absolute paths in toolchain
-# files — grep for $HOME before pushing.
+# against). It is passed down from build-package.sh (-r <chimera>); this
+# script stops with a message if it is absent. No $HOME guessing, no absolute
+# paths in toolchain files — grep for $HOME before pushing.
+#
+# The guest is an ELF x86-64 for the sandbox's fake machine, so the link runs
+# on Linux: natively there, or inside WSL Ubuntu from a Windows checkout
+# (tools/wsl/guest-build.sh; the miniBox build itself already lives in
+# ~/chimera and is shared by path translation below).
 set -eu
 HERE=$(dirname "$0")
+ROOT=$(cd "$HERE/.." && pwd -P)
 
 if [ -z "${MINIBOX_DIR:-}" ]; then
   echo "build-guest: MINIBOX_DIR is not set." >&2
@@ -21,12 +27,17 @@ fi
 
 "$HERE/apply-patches.sh"
 
-echo "build-guest: MINIBOX_DIR=$MINIBOX_DIR"
-echo "build-guest: M2 implements the guest meson wiring here:"
-echo "  - waterbox-guest cross file from \$MINIBOX_DIR/source/guest/"
-echo "  - fixed base 0x36f00000000 via linkscript.T"
-echo "  - guest flags: -mcmodel=large -mno-red-zone -fno-pic -fno-pie"
-echo "    -Dthread_local= -D_Thread_local= -D__thread= (no TLS; check-wbx.sh enforces)"
-echo "  - weak symbols forced with -Wl,-u,<name>; musl open() O_CLOEXEC wrap;"
-echo "    gaps collected in waterbox/guest-syscalls.cpp"
-echo "build-guest: STUB — full wiring lands in M2 after the M1 time seam."
+OUT="$ROOT/build/guest"
+if [ "$(uname -s)" = "Linux" ]; then
+  sh "$HERE/guest-link.sh" "$ROOT" "$MINIBOX_DIR" "$OUT"
+else
+  if ! command -v wsl.exe >/dev/null 2>&1; then
+    echo "build-guest: guest link needs Linux (or WSL with Ubuntu); neither found" >&2
+    exit 1
+  fi
+  export MSYS_NO_PATHCONV=1
+  # msys /home/admin/X == C:\Users\admin\X == WSL /mnt/c/Users/admin/X.
+  WSLROOT=$(cd "$ROOT" && pwd -W | sed 's|^\([A-Za-z]\):|/mnt/\L\1|; s|\|/|g')
+  wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/guest-build.sh" < /dev/null
+fi
+echo "build-guest: $OUT/core.wbx"

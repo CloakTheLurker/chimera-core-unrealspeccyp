@@ -9,10 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
+          repository: ToolAssisted-run/chimera
+          path: chimera
           submodules: recursive
+          fetch-depth: 1
+      - name: toolchain (guest link needs a C++ compiler, meson, ninja)
+        run: sudo apt-get update && sudo apt-get install -y g++ meson ninja-build
       - name: gate the package
-        run: ./waterbox/build-package.sh -r ~/chimera
+        run: ./waterbox/build-package.sh -r chimera
       - uses: actions/upload-artifact@v4
         with:
           name: unrealspeccyp-${{ github.sha }}

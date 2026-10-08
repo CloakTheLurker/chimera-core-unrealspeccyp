@@ -21,14 +21,17 @@ if [ ! -d "$CHIMERA/extern/chimera-common-minibox" ]; then
   echo "build-package: $CHIMERA/extern/chimera-common-minibox missing (recursive checkout?)" >&2
   exit 1
 fi
+CHIMERA=$(cd "$CHIMERA" && pwd -P)
+export MINIBOX_DIR="$CHIMERA/extern/chimera-common-minibox"
 
 "$HERE/build-native.sh"
-MINIBOX_DIR="$CHIMERA/extern/chimera-common-minibox" "$HERE/build-guest.sh"
+"$HERE/build-guest.sh"
 "$HERE/run-gate.sh"
 
 COMMIT=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
 WHEN=$(git -C "$ROOT" log -1 --format=%cI 2>/dev/null || echo unknown)
 mkdir -p "$ROOT/dist"
 cp "$HERE/waterbox.config" "$ROOT/dist/waterbox.config"
+cp "$ROOT/build/guest/core.wbx" "$ROOT/dist/core.wbx"
 echo "build-package: stamping version=$COMMIT versionDate=$WHEN (commit UTC, not build time)"
-echo "build-package: dist/ assembled (M0: config only; M2 adds core.wbx + LICENSES.md)."
+echo "build-package: dist/ assembled (core.wbx + waterbox.config; LICENSES.md from package-licenses.json lands with the package step)."
