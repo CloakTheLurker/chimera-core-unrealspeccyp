@@ -14,6 +14,8 @@
 # Quoting: every path expansion is quoted (the tree lives under
 # "Chimera Dev" — spaces are load-bearing). No space-joined file lists;
 # each TU compiles inside its own glob loop; "$@" carries -I flags.
+# Numbering is positional over a fixed TU order, so objects are resumable:
+# an .o newer than its source is kept. (A flag change needs rm obj/ by hand.)
 set -eu
 HERE=$(dirname "$0")
 ROOT=$(cd "$HERE/.." && pwd -P)
@@ -22,7 +24,6 @@ OUT="$ROOT/build/native"
 UP="$ROOT/build/upstream-patched"
 OBJ="$OUT/obj"
 mkdir -p "$OUT" "$OBJ"
-rm -f "$OBJ"/*.o
 
 "$HERE/apply-patches.sh" "$U" "$UP"
 
@@ -35,38 +36,45 @@ else
   echo "build-native: no system zlib — using vendored 3rdparty/zlib (as upstream cmake does)."
   ZLIB_SRCS="$UP/3rdparty/zlib"
 fi
+set -- -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2"
+if [ -n "$ZLIB_SRCS" ]; then
+  set -- "$@" -I"$UP/3rdparty/zlib"
+fi
 
-echo "build-native: compiling C++ (M0 headless reference)..."
+echo "build-native: compiling (M0 headless reference)..."
+I1="-I$UP"; I2="-I$UP/3rdparty/minizip"; I3="-I$UP/3rdparty/tinyxml2"; I4=""
+if [ -n "$ZLIB_SRCS" ]; then
+  I4="-I$UP/3rdparty/zlib"
+fi
+
+echo "build-native: compiling (M0 headless reference)..."
 n=0
+compile_cxx() {
+  n=$((n+1))
+  if [ -f "$OBJ/cxx_$n.o" ] && [ "$OBJ/cxx_$n.o" -nt "$1" ]; then return 0; fi
+  "$CXX" -std=gnu++11 -O2 -DUSE_BENCHMARK -D_POSIX "$I1" "$I2" "$I3" ${I4:+"$I4"} -c "$1" -o "$OBJ/cxx_$n.o"
+}
+compile_c() {
+  n=$((n+1))
+  if [ -f "$OBJ/c_$n.o" ] && [ "$OBJ/c_$n.o" -nt "$1" ]; then return 0; fi
+  "$CC" -O2 -D_POSIX "$I1" ${I4:+"$I4"} -c "$1" -o "$OBJ/c_$n.o"
+}
 # M0 source list mirrors the usp build/cmake core globs minus every UI/platform.
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
   for f in "$UP/$d/"*.cpp; do
     [ -f "$f" ] || continue
-    n=$((n+1))
-    "$CXX" -std=gnu++11 -O2 -DUSE_BENCHMARK -D_POSIX \
-      -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" \
-      -c "$f" -o "$OBJ/cxx_$n.o"
+    compile_cxx "$f"
   done
 done
 for f in "$UP/3rdparty/tinyxml2/tinyxml2.cpp" "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp" "$HERE/machine.cpp" "$HERE/run-native.cpp"; do
-  n=$((n+1))
-  "$CXX" -std=gnu++11 -O2 -DUSE_BENCHMARK -D_POSIX \
-    -I"$UP" -I"$UP/3rdparty/minizip" -I"$UP/3rdparty/tinyxml2" \
-    -c "$f" -o "$OBJ/cxx_$n.o"
+  compile_cxx "$f"
 done
-echo "build-native: compiling C..."
-set -- -I"$UP"
-if [ -n "$ZLIB_SRCS" ]; then
-  set -- "$@" -I"$UP/3rdparty/zlib"
-fi
 for f in "$UP/3rdparty/minizip/ioapi.c" "$UP/3rdparty/minizip/unzip.c"; do
-  n=$((n+1))
-  "$CC" -O2 -D_POSIX "$@" -c "$f" -o "$OBJ/c_$n.o"
+  compile_c "$f"
 done
 if [ -n "$ZLIB_SRCS" ]; then
   for f in "$ZLIB_SRCS"/*.c; do
-    n=$((n+1))
-    "$CC" -O2 -D_POSIX "$@" -c "$f" -o "$OBJ/c_$n.o"
+    compile_c "$f"
   done
 fi
 echo "build-native: linking..."
