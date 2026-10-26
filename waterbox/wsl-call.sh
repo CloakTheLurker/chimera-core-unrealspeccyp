@@ -21,7 +21,10 @@ wsl_call() {
     _attempt=$((_attempt+1))
     rm -f "$_log"
     export MSYS_NO_PATHCONV=1
-    wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$_script" "$_arg" < /dev/null > "$_log" 2>&1 &
+    # _arg is a space-joined token string (all leg tokens are space-free);
+    # word-split deliberately so the script sees separate $1, $2, ...
+    # shellcheck disable=SC2086
+    wsl.exe -d Ubuntu -- sh "$WSLROOT/tools/wsl/$_script" $_arg < /dev/null > "$_log" 2>&1 &
     _wpid=$!
     # Liveness first: a healthy session logs within ~60s (ninja check, patch
     # lines). A wedged session-start logs nothing — fail it fast (2 min),
@@ -56,7 +59,8 @@ wsl_call() {
       done
       echo "wsl_call: $_script no marker after ${_deadline}s (attempt $_attempt)" >&2
     fi
-    echo "wsl_call: terminating Ubuntu and retrying" >&2
+    cp "$_log" "$_log.attempt$_attempt" 2>/dev/null || true
+    echo "wsl_call: terminating Ubuntu and retrying (log kept at $_log.attempt$_attempt)" >&2
     kill $_wpid 2>/dev/null || true
     "$_taskkill" /F /PID $_wpid 2>/dev/null || true
     wsl.exe -t Ubuntu 2>/dev/null || true

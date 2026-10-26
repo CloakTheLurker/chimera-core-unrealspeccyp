@@ -20,6 +20,16 @@
 # Name the test content: exact file first (USP_TEST_CONTENT or test-content/
 # glob), firmware boot (in-tree res/rom) when none. The content in use is
 # always printed.
+#  m3-input-teeth ... Space+Enter held 600f MUST perturb the firmware run
+#                     (input reaches the machine). If it does not, this leg
+#                     fails — the input legs have no teeth.
+#  m3-input-parity .. guest with Space+Enter 600f agrees with native — input
+#                     is levels applied identically in both flavors.
+#  m3-rerecord ...... guest save+load around EVERY frame equals a plain run
+#                     (anything of the machine outside the arena shows up).
+#  m3-session ....... save at frame 299 in one process, continue 300 in
+#                     another: tstates + last-frame video/audio equal the
+#                     uninterrupted run (what a movie asks of a core).
 set -eu
 HERE=$(dirname "$0")
 ROOT=$(cd "$HERE/.." && pwd -P)
@@ -39,10 +49,13 @@ fi
 
 # Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL
 # (launch-and-poll through wsl-call.sh — see build-guest.sh for why).
+# Extra args ($3...) are joined into the single WSL arg string (all M3 leg
+# tokens are space-free flags/numbers) and re-split by sh inside WSL.
 on_guest_host() {
   if [ "$(uname -s)" = "Linux" ]; then
     mkdir -p "$ROOT/build/guest"
-    sh "$ROOT/tools/wsl/$1" "$2" 2>&1 | tee "$ROOT/build/guest/${1%.sh}.log"
+    _script="$1"; shift
+    sh "$ROOT/tools/wsl/$_script" "$@" 2>&1 | tee "$ROOT/build/guest/${_script%.sh}.log"
   else
     if ! command -v wsl.exe >/dev/null 2>&1; then
       echo "gate: guest legs need Linux (or WSL with Ubuntu); neither found" >&2
@@ -51,10 +64,11 @@ on_guest_host() {
     export MSYS_NO_PATHCONV=1
     WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
     . "$HERE/wsl-call.sh"
-    case "$1" in
-      check-wbx.sh) wsl_call "$1" "$2" "clean (no TLS" "$ROOT/build/guest/check-wbx.log" 300;;
-      guest-legs.sh) wsl_call "$1" "$2" "^run-wbx " "$ROOT/build/guest/guest-legs.log" 600;;
-      *) echo "gate: no marker for WSL leg $1" >&2; exit 1;;
+    _script="$1"; shift
+    case "$_script" in
+      check-wbx.sh) wsl_call "$_script" "$*" "clean (no TLS" "$ROOT/build/guest/check-wbx.log" 300;;
+      guest-legs.sh) wsl_call "$_script" "$*" "^run-wbx " "$ROOT/build/guest/guest-legs.log" 900;;
+      *) echo "gate: no marker for WSL leg $_script" >&2; exit 1;;
     esac
   fi
 }
@@ -101,7 +115,10 @@ fi
 echo "gate leg m1-host-clock: teeth confirmed (stalled state $HS != baseline $HB, dropped=$DROPPED)"
 
 if [ -z "${MINIBOX_DIR:-}" ]; then
-  if [ -d "$HOME/chimera/extern/chimera-common-minibox" ]; then
+  if [ -d "$ROOT/../chimera/extern/chimera-common-minibox" ]; then
+    MINIBOX_DIR="$ROOT/../chimera/extern/chimera-common-minibox"
+    export MINIBOX_DIR
+  elif [ -d "$HOME/chimera/extern/chimera-common-minibox" ]; then
     MINIBOX_DIR="$HOME/chimera/extern/chimera-common-minibox"
     export MINIBOX_DIR
   fi
@@ -133,6 +150,8 @@ GT=$(field_of /tmp/gate_wbx.log guest tstates)
 GV=$(field_of /tmp/gate_wbx.log guest vhash)
 GB=$(field_of /tmp/gate_wbx.log guest bhash)
 GM=$(field_of /tmp/gate_wbx.log guest mhash)
+GLV=$(field_of /tmp/gate_wbx.log guest lvhash)
+GLM=$(field_of /tmp/gate_wbx.log guest lmhash)
 echo "gate leg m2-parity: native=$SN guest=$SG"
 mismatch=0
 [ "$SN" = "$SG" ] || { echo "gate leg m2-parity: FAILED — state differs" >&2; mismatch=1; }
@@ -142,5 +161,46 @@ mismatch=0
 [ "$NM" = "$GM" ] || { echo "gate leg m2-parity: FAILED — mhash differs" >&2; mismatch=1; }
 [ "$mismatch" = "0" ] || exit 1
 echo "gate leg m2-parity: the sandbox did not change the answer"
+
+echo "gate leg m3-input-teeth: Space+Enter held 600f must perturb the machine"
+SNK=$(state_of --frames 600 --clock virtual --input-keys 0x3 --input-from 0 --input-to 600)
+echo "gate leg m3-input-teeth: no-input=$S0 input=$SNK"
+if [ "$SNK" = "$S0" ]; then echo "gate leg m3-input-teeth: FAILED — input changed nothing; the leg has no teeth" >&2; exit 1; fi
+
+echo "gate leg m3-input-parity: guest with Space+Enter 600f must agree with native"
+on_guest_host guest-legs.sh 600 --input-keys 0x3 --input-from 0 --input-to 600
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GK=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m3-input-parity: native=$SNK guest=$GK"
+[ "$SNK" = "$GK" ] || { echo "gate leg m3-input-parity: FAILED — input run differs across flavors" >&2; exit 1; }
+
+echo "gate leg m3-rerecord: guest save+load around EVERY frame must equal a plain run"
+on_guest_host guest-legs.sh 600 --rerecord
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GR=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m3-rerecord: plain=$SG rerecord=$GR"
+[ "$SG" = "$GR" ] || { echo "gate leg m3-rerecord: FAILED — machine state lives outside the arena snapshot" >&2; exit 1; }
+
+if [ "$(uname -s)" != "Linux" ]; then
+  # Fresh WSL session for the two-process dance: long gate runs degrade the
+  # session (wedged starts fail fast with no marker), and a save split
+  # across a wedged boundary proves nothing.
+  export MSYS_NO_PATHCONV=1
+  wsl.exe -t Ubuntu 2>/dev/null || true
+  sleep 10
+fi
+echo "gate leg m3-session: save at frame 299 in one process, continue 300 in another"
+on_guest_host guest-legs.sh 300 --save-at 299 --save-to /home/cloak/m3-session.state
+on_guest_host guest-legs.sh 300 --continue-from /home/cloak/m3-session.state
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+CT=$(field_of /tmp/gate_wbx.log guest tstates)
+CLV=$(field_of /tmp/gate_wbx.log guest lvhash)
+CLM=$(field_of /tmp/gate_wbx.log guest lmhash)
+echo "gate leg m3-session: continued tstates=$CT lvhash=$CLV lmhash=$CLM"
+[ "$GT" = "$CT" ] || { echo "gate leg m3-session: FAILED — tstates differ ($GT vs $CT)" >&2; exit 1; }
+[ "$GLV" = "$CLV" ] || { echo "gate leg m3-session: FAILED — last-frame video differs" >&2; exit 1; }
+[ "$GLM" = "$CLM" ] || { echo "gate leg m3-session: FAILED — last-frame audio differs" >&2; exit 1; }
+echo "gate leg m3-session: a savestate taken mid-run resumes the same machine"
+echo "gate leg m3-session: save file lives at /home/cloak/m3-session.state (native ext4: survives wsl -t, unlike /tmp)"
 
 echo "gate: done (all legs green)."

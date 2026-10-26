@@ -35,6 +35,9 @@ See `waterbox/package-licenses.json` and `extern/upstream/LICENSE`.
   parity with native over 600 firmware frames).
   `MINIBOX_DIR=~/chimera/extern/chimera-common-minibox`
   (passed down from `build-package.sh`; never guessed from `$HOME`).
+- **M3 — input levels + savestates (DONE 2026-10-26, gate green).** 2-byte
+  input levels (Kempston + Space/Enter) applied identically in both flavors;
+  rerecord + two-process session savestate legs green.
 
 ## Editing vs building
 

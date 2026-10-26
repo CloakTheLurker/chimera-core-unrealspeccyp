@@ -48,6 +48,21 @@ static intptr_t mem_reader(uintptr_t ud, uint8_t *data, uintptr_t size) {
   memcpy(data, m->p + m->pos, take); m->pos += take; return (intptr_t)take;
 }
 
+typedef struct { uint8_t *buf; size_t len, cap; } membuf_state;
+static int32_t mem_state_write(uintptr_t ud, const uint8_t *data, uintptr_t n) {
+  membuf_state *m = (membuf_state *)ud;
+  if(m->len + n > m->cap) {
+    size_t nc = (m->len + n) * 2 + 64;
+    uint8_t *nb = realloc(m->buf, nc);
+    if(!nb) return -1;
+    m->buf = nb; m->cap = nc;
+  }
+  memcpy(m->buf + m->len, data, n); m->len += n; return 0;
+}
+typedef struct { FILE *f; } fwriter;
+static int32_t file_state_write(uintptr_t ud, const uint8_t *data, uintptr_t size) {
+  return fwrite(data, 1, (size_t)size, ((fwriter *)ud)->f) == (size_t)size ? 0 : -1;
+}
 static uintptr_t proc(mb_host *h, const char *name) {
   mb_return r;
   wbx_get_proc_addr(h, name, &r);
@@ -76,13 +91,33 @@ int main(int argc, char **argv) {
   const char *wbx = NULL;
   const char *resdir = NULL;
   int frames = 600;
+  // Input levels (same 2-byte layout as run-native: byte0 Kempston bits,
+  // byte1 bit0 Space + bit1 Enter), held for [input_from, input_to).
+  unsigned input_mask = 0, input_keys = 0;
+  int input_from = -1, input_to = -1;
+  // Savestate modes (M3): --rerecord saves+loads around EVERY frame (must be
+  // identical to an uninterrupted run); --save-to/--save-at + --continue-from
+  // split one run across two processes (the session leg: a movie asks this).
+  int rerecord = 0;
+  int save_at = -1;
+  const char *save_to = NULL;
+  const char *continue_from = NULL;
   for(int i = 1; i < argc; i++) {
     if(!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--resdir") && i + 1 < argc) resdir = argv[++i];
     else if(!strcmp(argv[i], "--help")) {
-      printf("usage: run-wbx [--frames N] [--resdir D] <core.wbx>\n");
+      printf("usage: run-wbx [--frames N] [--resdir D] [--input-mask M] [--rerecord] [--save-at N --save-to FILE] [--continue-from FILE] <core.wbx>");
       return 0;
-    } else wbx = argv[i];
+    }
+    else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
+    else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
+    else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--input-to") && i + 1 < argc) input_to = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--rerecord")) rerecord = 1;
+    else if(!strcmp(argv[i], "--save-at") && i + 1 < argc) save_at = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--save-to") && i + 1 < argc) save_to = argv[++i];
+    else if(!strcmp(argv[i], "--continue-from") && i + 1 < argc) continue_from = argv[++i];
+    else wbx = argv[i];
   }
   if(!wbx) { fprintf(stderr, "run-wbx: need <core.wbx>\n"); return 1; }
 
@@ -132,6 +167,18 @@ int main(int argc, char **argv) {
 
   frame_fn FrameAdvance = (frame_fn)proc(h, "FrameAdvance");
   bgra_fn GetVideoBgra = (bgra_fn)proc(h, "GetVideoBgra");
+  if(continue_from) {
+    /* session leg, second process: pick up exactly where the first left off */
+    FILE *sf = fopen(continue_from, "rb");
+    if(!sf) { fprintf(stderr, "run-wbx: cannot open %s\n", continue_from); return 1; }
+    freader fr2 = { sf };
+    wbx_deactivate_host(h, &r);
+    wbx_load_state(h, file_read, (uintptr_t)&fr2, &r);
+    fclose(sf);
+    if(r.error_message[0]) { fprintf(stderr, "run-wbx: load %s: %s\n", continue_from, r.error_message); return 1; }
+    wbx_activate_host(h, &r);
+  }
+
   raw_fn GetVideoRaw = (raw_fn)proc(h, "GetVideoRaw");
   audio_fn GetAudio = (audio_fn)proc(h, "GetAudio");
   audiobuf_fn GetAudioBuf = (audiobuf_fn)proc(h, "GetAudioBuf");
@@ -139,15 +186,33 @@ int main(int argc, char **argv) {
 
   const uint64_t FNV_SEED = 1469598103934665603ULL;
   uint64_t vhash = FNV_SEED, bhash = FNV_SEED, mhash = FNV_SEED;
+  uint64_t lvhash = FNV_SEED, lmhash = FNV_SEED; // last-frame only: the session leg compares these + tstates
   static uint32_t bgra[320 * 240];
   static int16_t mixed[2048];
   for(int i = 0; i < frames; i++) {
-    FrameAdvance(NULL, 0);
+    bool held = (input_from >= 0 && i >= input_from && (input_to < 0 || i < input_to));
+    uint8_t inbytes[2] = { (uint8_t)(held ? (input_mask & 0x1F) : 0), (uint8_t)(held ? (input_keys & 0x03) : 0) };
+    if(rerecord) {
+      /* rerecord leg: save+load before EVERY frame — the run must be
+       * identical to one that did not. Anything of the machine living
+       * outside the arena shows up here. */
+      membuf_state st = {0, 0, 0};
+      wbx_deactivate_host(h, &r);
+      wbx_save_state(h, mem_state_write, (uintptr_t)&st, &r);
+      if(r.error_message[0]) { fprintf(stderr, "run-wbx: save: %s\n", r.error_message); return 1; }
+      memreader mr = { st.buf, st.len, 0 };
+      wbx_load_state(h, mem_reader, (uintptr_t)&mr, &r);
+      if(r.error_message[0]) { fprintf(stderr, "run-wbx: load: %s\n", r.error_message); free(st.buf); return 1; }
+      wbx_activate_host(h, &r);
+      free(st.buf);
+    }
+    FrameAdvance(inbytes, 2);
     die_if_dead(h, "in FrameAdvance");
     const uint8_t *raw = GetVideoRaw();
     uint8_t rawcopy[320 * 240];
     memcpy(rawcopy, raw, sizeof rawcopy);
     vhash = fnv1a(rawcopy, sizeof rawcopy, vhash);
+    lvhash = fnv1a(rawcopy, sizeof rawcopy, FNV_SEED);
     const uint32_t *g = GetVideoBgra(NULL, NULL);
     memcpy(bgra, g, sizeof bgra);
     bhash = fnv1a(bgra, sizeof bgra, bhash);
@@ -158,8 +223,19 @@ int main(int argc, char **argv) {
       fprintf(stderr, "run-wbx: GetAudio disagrees with GetAudioBuf at frame %d\n", i);
       return 1;
     }
-    if(wrote)
-      mhash = fnv1a(mixed, wrote * sizeof(int16_t), mhash);
+    if(wrote) { mhash = fnv1a(mixed, wrote * sizeof(int16_t), mhash); lmhash = fnv1a(mixed, wrote * sizeof(int16_t), FNV_SEED); }
+    if(save_to && save_at >= 0 && i == save_at) {
+      /* session leg, first process: freeze the machine mid-run to a file */
+      FILE *sf = fopen(save_to, "wb");
+      if(!sf) { fprintf(stderr, "run-wbx: cannot write %s\n", save_to); return 1; }
+      fwriter fw = { sf };
+      wbx_deactivate_host(h, &r);
+      wbx_save_state(h, file_state_write, (uintptr_t)&fw, &r);
+      fclose(sf);
+      if(r.error_message[0]) { fprintf(stderr, "run-wbx: save %s: %s\n", save_to, r.error_message); return 1; }
+      wbx_activate_host(h, &r);
+      fprintf(stderr, "[run-wbx] saved frame %d to %s\n", i, save_to);
+    }
   }
   uint64_t tstates = GetTStates();
   uint64_t state = vhash;
@@ -167,12 +243,10 @@ int main(int argc, char **argv) {
   state = mix_hash(state, mhash);
   state = mix_hash(state, tstates);
   state = mix_hash(state, (uint64_t)frames);
-  printf("run-wbx frames=%d stepped=%d tstates=%llu vhash=%016llx bhash=%016llx mhash=%016llx state=%016llx file=(firmware)\n",
+  printf("run-wbx frames=%d stepped=%d tstates=%llu vhash=%016llx bhash=%016llx mhash=%016llx lvhash=%016llx lmhash=%016llx state=%016llx file=(firmware)\n",
       frames, frames,
       (unsigned long long)tstates,
       (unsigned long long)vhash, (unsigned long long)bhash,
-      (unsigned long long)mhash, (unsigned long long)state);
-  wbx_deactivate_host(h, &r);
-  wbx_destroy_host(h, &r);
-  return 0;
+      (unsigned long long)mhash, (unsigned long long)lvhash,
+      (unsigned long long)lmhash, (unsigned long long)state);
 }

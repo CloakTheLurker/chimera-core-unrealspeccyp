@@ -163,7 +163,26 @@ The emulator through the musl guest toolchain, linked into `core.wbx`.
   `version`/`versionDate` are stamped by `build-package.sh`, never
   hand-written.
 
-## Later (per porting doc, in order)
+## M3 — input levels + savestates (DONE 2026-10-26)
+> DONE 2026-10-26, gate green end to end. Input is levels: byte0 Kempston
+> (bit0 Right, bit1 Left, bit2 Down, bit3 Up, bit4 Fire) + byte1 keys (bit0
+> Space, bit1 Enter), applied whole every frame via Machine::SetInputMask in
+> BOTH flavors (native --input-mask/--input-keys += from/to; guest
+> FrameAdvance decodes the same bytes). Teeth: Space+Enter over 600 firmware
+> frames perturbs the machine (state differs); parity: guest-with-input ==
+> native-with-input. Savestates: rerecord leg (save+load around EVERY frame
+> == plain run) and session leg (save at 299 in one process, continue 300 in
+> another: tstates + last-frame video/audio lvhash/lmhash equal the
+> uninterrupted run) both green. No traps: kbd/joy OnKey calls are
+> idempotent levels, no new syscalls (fopen/fread on mounts only).
+> Environment lessons: musl/libstdc++ configures die on spaces in
+> srcdir/builddir — minibox now builds in a WSL-native space-free mirror
+> (tools/wsl/mb-sync.sh; guest-link consumes MB_SRC_DIR/MB_BUILD_DIR, CI
+> keeps the checkout-defaults path); WSL wsl.exe -t WIPES /tmp, so the
+> session state file lives at /home/cloak (the retry -t was deleting its own
+> evidence); wsl_call preserves per-attempt logs for post-mortem.
+
+Porting-doc mapping: item 4 (picture) was already done in M2 (ULA framebuffer read, parity holds); item 5 input is done here (audio pull was M1/M2); item 6 savestates done here (no StateLoaded needed — nothing derived lives in alloc_invisible). Item 3 (machine filesystem) needs no work for firmware boot: ROMs mount by name, no writable drives yet. Remaining: item 7 package + publishing checklist.
 
 3. Machine filesystem: mounts by name only; prefer serving drives from guest
    memory over teaching upstream a VFS (writes become savestate for free).

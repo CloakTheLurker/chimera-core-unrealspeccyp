@@ -94,6 +94,12 @@ int main(int argc, char** argv) {
   const char* clock = "virtual";
   int stall_ms = 0;
   int stall_at = -1;
+  // Input levels: --input-mask 0x1F held for frames [input-from, input-to).
+  // Same byte layout as the guest FrameAdvance input (bit0 Right, bit1
+  // Left, bit2 Down, bit3 Up, bit4 Fire), applied via the same
+  // Machine::SetInputMask — parity compares the identical path.
+  unsigned input_mask = 0, input_keys = 0;
+  int input_from = -1, input_to = -1;
   bool trace = false;
   for(int i = 1; i < argc; i++) {
     if(!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
@@ -102,10 +108,14 @@ int main(int argc, char** argv) {
     else if(!strcmp(argv[i], "--stall-at") && i + 1 < argc) stall_at = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--resdir") && i + 1 < argc) resdir_override = argv[++i];
     else if(!strcmp(argv[i], "--trace-instr")) trace = true;
+    else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
+    else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
+    else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--input-to") && i + 1 < argc) input_to = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--dump-video")) {} // kept: video is always hashed (M1)
     else if(!strcmp(argv[i], "--pull-audio")) {} // kept: audio is always pulled (M1)
     else if(!strcmp(argv[i], "--help")) {
-      printf("usage: run-native [--frames N] [--clock virtual|host] [--stall-ms M --stall-at F] [--resdir D] [--trace-instr] [file]\n");
+      printf("usage: run-native [--frames N] [--clock virtual|host] [--stall-ms M --stall-at F] [--resdir D] [--trace-instr] [--input-mask M --input-from F --input-to T] [file]"); puts("");
       printf("  no file: firmware boot (Reset + step); file: eFileType-open then step.\n");
       return 0;
     } else file = argv[i];
@@ -155,6 +165,8 @@ int main(int argc, char** argv) {
       usp_sleep_ms((unsigned)stall_ms); // host stalls; the machine must not notice
     if(host && !pacer.Next())
       continue; // DROP: wall-coupled catch-up skipped this machine frame
+    bool held = (input_from >= 0 && f >= input_from && (input_to < 0 || f < input_to));
+    m.SetInputMask((uint8_t)(held ? (input_mask & 0x1F) : 0), (uint8_t)(held ? (input_keys & 0x03) : 0));
     m.FrameAdvance();
     ++stepped;
     vclock.AdvanceFrames();

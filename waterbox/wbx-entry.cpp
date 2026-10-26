@@ -11,9 +11,7 @@
 // Video: ULA indexed framebuffer converted with palette.h (same function
 // the native parity hash uses). Audio: Machine::MixedAudio, pulled once per
 // frame — pulling runs the machine's callbacks, so the guest pulls exactly
-// like the reference. Input: M2 ignores levels (parity is on firmware boot;
-// SetButton lands with the input work) — the signature is already the one
-// the engine will drive.
+// like the reference. Input: byte-0 Kempston levels via SetInputMask.
 #include "std.h" // upstream types first, like every upstream .cpp
 #include "machine.h"
 #include "palette.h"
@@ -29,9 +27,16 @@ ECL_EXPORT bool Init(void) {
   return g_machine != 0;
 }
 
+
+
 ECL_EXPORT void FrameAdvance(const uint8_t* input_bits, int32_t input_len) {
-  (void)input_bits;
-  (void)input_len; // M2: levels, not events — applied with the input work
+  // Levels, not events: byte 0 = Kempston for THIS frame (bit0 Right, bit1
+  // Left, bit2 Down, bit3 Up, bit4 Fire), byte 1 = keys (bit0 Space, bit1
+  // Enter). Applied whole every frame via SetInputMask — press and release
+  // are both just levels. The engine holds input_bits for the frame.
+  uint8_t k = (input_bits && input_len >= 1) ? input_bits[0] : 0;
+  uint8_t c = (input_bits && input_len >= 2) ? input_bits[1] : 0;
+  g_machine->SetInputMask(k, c);
   g_machine->FrameAdvance();
 }
 

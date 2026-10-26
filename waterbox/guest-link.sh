@@ -15,12 +15,18 @@ UP="$OUT/upstream-patched"
 stamp() { date "+guest-link: [%H:%M:%S] $1"; }
 stamp "start"
 sh "$CORE/waterbox/apply-patches.sh" "$U" "$UP"
-MB_BUILD="$MINIBOX/build/meson-linux"
+# Toolchain source+build: MB_SRC_DIR/MB_BUILD_DIR override the MINIBOX-derived
+# defaults. The override exists because musl's (and libstdc++'s) configure
+# cannot handle spaces in srcdir/builddir — on a spaced checkout (WSL here)
+# miniBox lives in a space-free native mirror (tools/wsl/mb-sync.sh); on CI
+# Linux the checkout itself is space-free and the defaults just work.
+MB_SRC="${MB_SRC_DIR:-$MINIBOX}"
+MB_BUILD="${MB_BUILD_DIR:-$MINIBOX/build/meson-linux}"
 SYSROOT="$MB_BUILD/guest-sysroot"
 MUSL_GCC="$MB_BUILD/musl-gcc"
 EMULIBC_OBJ="$MB_BUILD/source/guest/emulibc.c.o"
 CXXGLUE_OBJ="$MB_BUILD/source/guest/cxxglue.c.o"
-LINKSCRIPT="$MINIBOX/source/guest/linkscript.T"
+LINKSCRIPT="$MB_SRC/source/guest/linkscript.T"
 # Toolchain bootstrap: miniBox builds musl + the guest C++ stdlib itself, but
 # meson marks those custom targets build_by_default=false — plain `ninja`
 # skips them (only `meson test` would pull them via test deps). So ask for
@@ -31,7 +37,7 @@ if [ ! -f "$MB_BUILD/build.ninja" ]; then
   case "$MESON_BIN" in *" "*) ;; *) command -v "$MESON_BIN" >/dev/null 2>&1 || { echo "guest-link: need meson (or MESON=...) to configure miniBox" >&2; exit 1; };; esac
   # MESON may be "python3 path/meson.py": word-split intended.
   # shellcheck disable=SC2086
-  $MESON_BIN setup "$MB_BUILD" "$MINIBOX" -Dguest_cpp=true
+  $MESON_BIN setup "$MB_BUILD" "$MB_SRC" -Dguest_cpp=true
 fi
 # NINJA may be "path/ninja with args": word-split intended.
 # shellcheck disable=SC2086
@@ -48,7 +54,7 @@ GXX_INC="$SYSROOT/include/c++/$GCC_VER"
 if [ ! -d "$GXX_INC" ]; then echo "guest-link: no $GXX_INC (host g++ $GCC_VER != toolchain compiler?)" >&2; exit 1; fi
 
 # Frozen guest flags (minibox source/guest/meson.build: waterbox_guest_cflags).
-GCFLAGS="-fvisibility=hidden -I$MINIBOX/extern/emulibc -I$MINIBOX/source/guest/include -I$MINIBOX/extern/jsmn -Wall -mcmodel=large -mno-red-zone -mstack-protector-guard=global -fno-stack-protector -fno-pic -fno-pie -fcf-protection=none -O2 -DNDEBUG"
+GCFLAGS="-fvisibility=hidden -I$MB_SRC/extern/emulibc -I$MB_SRC/source/guest/include -I$MB_SRC/extern/jsmn -Wall -mcmodel=large -mno-red-zone -mstack-protector-guard=global -fno-stack-protector -fno-pic -fno-pie -fcf-protection=none -O2 -DNDEBUG"
 # No thread-local storage: a TLS write with no thread pointer lands wherever
 # %fs happens to point. check-wbx.sh enforces this on the linked image.
 GCFLAGS="$GCFLAGS -Dthread_local= -D_Thread_local= -D__thread="
@@ -104,6 +110,6 @@ echo "guest-link: $n objects; linking core.wbx..."
 g++ $GCXXFLAGS $GLDFLAGS -o "$OUT/core.wbx" "$OUT/obj/"g*.o "$CXXGLUE_OBJ" "$EMULIBC_OBJ" $GLIBS
 stamp "hygiene"
 echo "guest-link: hygiene (TLS/%fs/red-zone)..."
-sh "$MINIBOX/source/guest/check-wbx.sh" "$OUT/core.wbx"
+sh "$MB_SRC/source/guest/check-wbx.sh" "$OUT/core.wbx"
 stamp "done"
 ls -la "$OUT/core.wbx"

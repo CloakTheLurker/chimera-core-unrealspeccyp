@@ -43,8 +43,41 @@ const void* Machine::AudioData(int source) { return SoundDev(speccy, source)->Au
 uint32_t Machine::AudioDataReady(int source) { return SoundDev(speccy, source)->AudioDataReady(); }
 void Machine::AudioDataUse(int source, uint32_t size) { SoundDev(speccy, source)->AudioDataUse(size); }
 
-void Machine::SetButton(const char* /*name*/, bool /*held*/) {
-  // M2: levels, not events — the host says what is held this frame.
+
+
+void Machine::SetButton(const char* name, bool held) {
+  // Levels, not events: the host says what is held. Called with the FULL
+  // state every frame, so press and release are both just the current level.
+  struct Map { const char* name; char key; bool kbd; };
+  static const Map map[] = {
+    {"Kempston.Right", 'r', false}, {"Kempston.Left", 'l', false},
+    {"Kempston.Down", 'd', false}, {"Kempston.Up", 'u', false},
+    {"Kempston.Fire", 'f', false},
+    {"Key.Space", ' ', true}, {"Key.Enter", 'e', true},
+    {NULL, 0, false},
+  };
+  for(const Map* m = map; m->name; m++) {
+    if(!strcmp(name, m->name)) {
+      if(m->kbd)
+        speccy->Device<eKeyboard>()->OnKey(m->key, held, false, false, false);
+      else
+        speccy->Device<eKempstonJoy>()->OnKey(m->key, held);
+      return;
+    }
+  }
+}
+
+void Machine::SetInputMask(uint8_t kempston, uint8_t keys) {
+  // Byte 0: Kempston (bit0 Right, bit1 Left, bit2 Down, bit3 Up, bit4 Fire).
+  // Byte 1: keyboard (bit0 Space, bit1 Enter). Applies the full level every
+  // call — the ONLY input path in both flavors.
+  SetButton("Kempston.Right", (kempston & 0x01) != 0);
+  SetButton("Kempston.Left",  (kempston & 0x02) != 0);
+  SetButton("Kempston.Down",  (kempston & 0x04) != 0);
+  SetButton("Kempston.Up",    (kempston & 0x08) != 0);
+  SetButton("Kempston.Fire",  (kempston & 0x10) != 0);
+  SetButton("Key.Space",      (keys & 0x01) != 0);
+  SetButton("Key.Enter",      (keys & 0x02) != 0);
 }
 
 // MixedAudio: sum the three sources per sample like eSoundMixer::Update

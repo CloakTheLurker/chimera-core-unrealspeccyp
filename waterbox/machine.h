@@ -35,6 +35,7 @@ public:
   // Returns int16 elements written (<= capacity).
   uint32_t MixedAudio(int16_t* stereo, uint32_t capacity);
   void SetButton(const char* name, bool held);
+  void SetInputMask(uint8_t kempston, uint8_t keys); // bytes 0-1 input: full level per frame
 private:
   eSpeccy* speccy;
 };
