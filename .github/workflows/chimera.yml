@@ -1,0 +1,74 @@
+# Unofficial core: gate + contract tests only. No publish job and no daily
+# schedule — an unofficial core is not in Chimera's official-cores.json and
+# publishes nowhere on its own. (Publishing is the owner's approval + roster
+# row + publish-core.yml call; see chimera/docs/new-core.md section 9.)
+name: chimera-core-unrealspeccyp CI
+on:
+  push:
+  pull_request:
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ToolAssisted-run/chimera
+          path: chimera
+          submodules: recursive
+          fetch-depth: 1
+      - name: toolchain (guest link needs a C++ compiler, meson, ninja)
+        run: sudo apt-get update && sudo apt-get install -y g++ meson ninja-build python3
+      - name: gate the package
+        run: ./waterbox/build-package.sh -r chimera
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unrealspeccyp-${{ github.sha }}
+          path: chimera-core-unrealspeccyp/dist/*.chimeraCore
+  contract:
+    # Chimera's contract tests open the built package (no content needed).
+    # Same shape as chimera's own "frontend against real packages" job:
+    # mono hosts the net48 tests on Linux; libchimera reads the package.
+    runs-on: ubuntu-latest
+    needs: gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ToolAssisted-run/chimera
+          path: chimera
+          submodules: recursive
+          fetch-depth: 1
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            meson ninja-build build-essential cmake pkg-config python3 \
+            mono-complete \
+            libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+      - name: Build native dependencies (installs into build/dll)
+        working-directory: chimera
+        run: |
+          meson setup build/meson-linux --prefix "$PWD/build" --libdir dll
+          meson compile -C build/meson-linux
+          meson install -C build/meson-linux
+      - name: Build the tests
+        working-directory: chimera
+        run: dotnet build source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj -c Release /nodeReuse:false -p:UseSharedCompilation=false
+      - name: Download the gated package
+        uses: actions/download-artifact@v4
+        with:
+          name: unrealspeccyp-${{ github.sha }}
+          path: package
+      - name: Contract tests against the package
+        working-directory: chimera
+        env:
+          CHIMERA_CORES_DIR: ${{ github.workspace }}/package
+        run: |
+          dotnet test source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj \
+            -c Release --no-build --nologo \
+            --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"

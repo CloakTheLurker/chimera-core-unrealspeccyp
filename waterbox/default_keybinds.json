@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "Default bindings for the controller this package declares. Chimera ships",
+    "no bindings of its own - a package that declares a controller says how",
+    "it is played by default, and the frontend uses that for a controller",
+    "the user's config has never seen. Key names are what Chimera sends",
+    "(arrows, letters, Space, Enter); gamepad/joystick names take the form",
+    "X1 A (Xbox pad), J1 B1 (plain joystick). Unbound buttons stay unbound:",
+    "only the Kempston-on-arrows preset and the QAOP letters are bound here,",
+    "the Sinclair and Cursor presets are picked in the controller config."
+  ],
+  "AllTrollers": {
+    "ZX Spectrum": {
+      "Kempston.Up": "Up",
+      "Kempston.Down": "Down",
+      "Kempston.Left": "Left",
+      "Kempston.Right": "Right",
+      "Kempston.Fire": "X",
+      "QAOP.Up": "Q",
+      "QAOP.Down": "A",
+      "QAOP.Left": "O",
+      "QAOP.Right": "P",
+      "QAOP.Fire": "M",
+      "Key.Space": "Space",
+      "Key.Enter": "Enter"
+    }
+  }
+}

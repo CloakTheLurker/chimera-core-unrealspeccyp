@@ -33,24 +33,31 @@ See `waterbox/package-licenses.json` and `extern/upstream/LICENSE`.
 - **M2 — guest build (DONE 2026-10-08, gate green).** Same emulator through
   the musl guest toolchain into `core.wbx` (670KB, hygiene-clean, bit-identical
   parity with native over 600 firmware frames).
-  `MINIBOX_DIR=~/chimera/extern/chimera-common-minibox`
+  `MINIBOX_DIR=../chimera/extern/chimera-common-minibox`
   (passed down from `build-package.sh`; never guessed from `$HOME`).
 - **M3 — input levels + savestates (DONE 2026-10-26, gate green).** 2-byte
   input levels (Kempston + Space/Enter) applied identically in both flavors;
   rerecord + two-process session savestate legs green.
 
+- **M4 — the package (DONE 2026-10-27, unofficial core).** Real engine ABI
+  (`FrameAdvance(uint64_t)` + `SetButton`), 22 declared buttons with
+  mnemonics, settings that reach the machine (mode48k/fastTape/soundChip),
+  5 firmware ROMs with sizes + SHA1s, `default_keybinds.json`, current-schema
+  `package-licenses.json`, zipped `.chimeraCore`. Gate green; Chimera's
+  contract tests 26/26. No roster row, no publish job (unofficial).
+
 ## Editing vs building
 
-Edit here (`Chimera Dev/chimera-core-unrealspeccyp`), build from `~/`
-copies. `tools/sync-to-home.sh` does the `cp -a` sync for both this repo
-and `Chimera Dev/chimera` → `~/chimera`, then checks `MINIBOX_DIR`.
+Edit here (`Chimera Dev/chimera-core-unrealspeccyp`); the guest links on
+Linux natively, or inside WSL Ubuntu via `tools/wsl/` (see
+docs/BUILDING.md). `build-package.sh -r` takes the sibling `chimera`
+checkout; `MINIBOX_DIR` (`chimera/extern/chimera-common-minibox`) is passed
+down from it — never guessed from `$HOME`, no absolute paths in scripts.
 
 ## Build
 
 ```
-./waterbox/build-native.sh                                   # M0
-./waterbox/run-gate.sh                                       # legs
-MINIBOX_DIR=~/chimera/extern/chimera-common-minibox \
-  ./waterbox/build-guest.sh                                  # M2
-./waterbox/build-package.sh -r ~/chimera                     # everything CI runs
+./waterbox/build-native.sh                     # M0
+./waterbox/run-gate.sh                         # legs
+./waterbox/build-package.sh -r ../chimera      # everything CI runs
 ```

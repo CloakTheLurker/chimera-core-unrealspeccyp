@@ -16,10 +16,6 @@
 #include "devices/input/tape.h"
 #include "z80/z80.h"
 
-Machine::Machine() : speccy(new eSpeccy) {}
-Machine::~Machine() { delete speccy; }
-void Machine::Reset() { speccy->Reset(); }
-void Machine::FrameAdvance() { speccy->Update(NULL); }
 uint64_t Machine::TStates() const { return speccy->T(); }
 uint32_t Machine::FrameTacts() const { return speccy->CPU()->FrameTacts(); }
 const void* Machine::Video() const { return speccy->Device<eUla>()->Screen(); }
@@ -44,40 +40,53 @@ uint32_t Machine::AudioDataReady(int source) { return SoundDev(speccy, source)->
 void Machine::AudioDataUse(int source, uint32_t size) { SoundDev(speccy, source)->AudioDataUse(size); }
 
 
+Machine::Machine() : speccy(new eSpeccy), fast_tape(true) {}
+Machine::~Machine() { delete speccy; }
 
-void Machine::SetButton(const char* name, bool held) {
-  // Levels, not events: the host says what is held. Called with the FULL
-  // state every frame, so press and release are both just the current level.
-  struct Map { const char* name; char key; bool kbd; };
-  static const Map map[] = {
-    {"Kempston.Right", 'r', false}, {"Kempston.Left", 'l', false},
-    {"Kempston.Down", 'd', false}, {"Kempston.Up", 'u', false},
-    {"Kempston.Fire", 'f', false},
-    {"Key.Space", ' ', true}, {"Key.Enter", 'e', true},
-    {NULL, 0, false},
-  };
-  for(const Map* m = map; m->name; m++) {
-    if(!strcmp(name, m->name)) {
-      if(m->kbd)
-        speccy->Device<eKeyboard>()->OnKey(m->key, held, false, false, false);
-      else
-        speccy->Device<eKempstonJoy>()->OnKey(m->key, held);
-      return;
-    }
-  }
+void Machine::Configure(bool mode48k, bool fastTape, int soundChip) {
+  speccy->Mode48k(mode48k);
+  fast_tape = fastTape;
+  speccy->Device<eAY>()->SetChip(
+      soundChip == 1 ? eAY::CHIP_YM : eAY::CHIP_AY);
 }
 
-void Machine::SetInputMask(uint8_t kempston, uint8_t keys) {
-  // Byte 0: Kempston (bit0 Right, bit1 Left, bit2 Down, bit3 Up, bit4 Fire).
-  // Byte 1: keyboard (bit0 Space, bit1 Enter). Applies the full level every
-  // call — the ONLY input path in both flavors.
-  SetButton("Kempston.Right", (kempston & 0x01) != 0);
-  SetButton("Kempston.Left",  (kempston & 0x02) != 0);
-  SetButton("Kempston.Down",  (kempston & 0x04) != 0);
-  SetButton("Kempston.Up",    (kempston & 0x08) != 0);
-  SetButton("Kempston.Fire",  (kempston & 0x10) != 0);
-  SetButton("Key.Space",      (keys & 0x01) != 0);
-  SetButton("Key.Enter",      (keys & 0x02) != 0);
+void Machine::Reset() { speccy->Reset(); }
+
+void Machine::FrameAdvance() {
+  // Upstream installs the fast-tape step only while a tape runs (and takes
+  // it off when the tape stops); mirror that exactly. The step's ROM-pattern
+  // fast paths (incl. delay-loop acceleration) must never fire outside a
+  // tape load, and with no tape loaded this is a no-op identical to M2.
+  speccy->CPU()->HandlerStep(
+      (fast_tape && speccy->Device<eTape>()->Started()) ? fast_tape_emul : NULL);
+  speccy->Update(NULL);
+}
+
+// Button table in waterbox.config input.buttons declaration order: bit i of
+// the engine's 64-bit mask. NEVER reorder (movie contract); append only, and
+// past 64 the SetButton export (below) is what carries the rest.
+struct ButtonBinding { bool kbd; char key; };
+static const ButtonBinding kButtons[] = {
+  {false,'u'}, {false,'d'}, {false,'l'}, {false,'r'}, {false,'f'}, // Kempston U/D/L/R/Fire
+  {true,'9'}, {true,'8'}, {true,'6'}, {true,'7'}, {true,'0'},      // Sinclair (upstream SINCLAIR2 map)
+  {true,'7'}, {true,'6'}, {true,'5'}, {true,'8'}, {true,'0'},      // Cursor (upstream CURSOR map)
+  {true,'Q'}, {true,'A'}, {true,'O'}, {true,'P'}, {true,'M'},      // QAOP (upstream QAOPM map)
+  {true,' '}, {true,'e'},                                          // Key.Space, Key.Enter
+};
+
+void Machine::SetButtonByIndex(int index, bool held) {
+  if(index < 0 || index >= ButtonCount())
+    return;
+  const ButtonBinding& b = kButtons[index];
+  if(b.kbd)
+    speccy->Device<eKeyboard>()->OnKey(b.key, held, false, false, false);
+  else
+    speccy->Device<eKempstonJoy>()->OnKey(b.key, held);
+}
+
+void Machine::ApplyMask(uint64_t mask) {
+  for(int i = 0; i < ButtonCount(); i++)
+    SetButtonByIndex(i, ((mask >> i) & 1ull) != 0);
 }
 
 // MixedAudio: sum the three sources per sample like eSoundMixer::Update

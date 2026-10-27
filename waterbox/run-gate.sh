@@ -203,4 +203,20 @@ echo "gate leg m3-session: continued tstates=$CT lvhash=$CLV lmhash=$CLM"
 echo "gate leg m3-session: a savestate taken mid-run resumes the same machine"
 echo "gate leg m3-session: save file lives at /home/cloak/m3-session.state (native ext4: survives wsl -t, unlike /tmp)"
 
+echo "gate leg m4-settings-teeth: mode48k must perturb the firmware boot (native)"
+SN48=$(state_of --frames 600 --clock virtual --mode48k)
+echo "gate leg m4-settings-teeth: default=$S0 mode48k=$SN48"
+[ "$SN48" != "$S0" ] || { echo "gate leg m4-settings-teeth: FAILED — mode48k changed nothing; the leg has no teeth" >&2; exit 1; }
+
+echo "gate leg m4-settings-parity: guest with mode48k+ym agrees with native"
+printf '{"mode48k": true, "soundChip": "ym"}' > "$ROOT/build/guest/m48ym.json"
+SN48YM=$(state_of --frames 600 --clock virtual --mode48k --sound-chip ym)
+echo "gate leg m4-settings-parity: native: $(summary_of)"
+on_guest_host guest-legs.sh 600 --settings-json m48ym.json
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+SG48=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m4-settings-parity: native=$SN48YM guest=$SG48"
+[ "$SN48YM" = "$SG48" ] || { echo "gate leg m4-settings-parity: FAILED — settings run differs across flavors" >&2; exit 1; }
+echo "gate leg m4-settings-parity: the settings channel reaches the machine identically in both flavors"
+
 echo "gate: done (all legs green)."

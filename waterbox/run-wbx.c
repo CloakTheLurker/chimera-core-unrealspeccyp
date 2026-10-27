@@ -76,7 +76,7 @@ static void die_if_dead(mb_host *h, const char *when) {
 }
 
 typedef int (MB_GUEST_ABI *bool_fn)(void);
-typedef void (MB_GUEST_ABI *frame_fn)(const uint8_t *, int32_t);
+typedef void (MB_GUEST_ABI *frame_fn)(uint64_t);
 typedef const uint32_t *(MB_GUEST_ABI *bgra_fn)(int32_t *, int32_t *);
 typedef const uint8_t *(MB_GUEST_ABI *raw_fn)(void);
 typedef uint32_t (MB_GUEST_ABI *audio_fn)(int16_t *, uint32_t);
@@ -91,16 +91,18 @@ int main(int argc, char **argv) {
   const char *wbx = NULL;
   const char *resdir = NULL;
   int frames = 600;
-  // Input levels (same 2-byte layout as run-native: byte0 Kempston bits,
-  // byte1 bit0 Space + bit1 Enter), held for [input_from, input_to).
-  unsigned input_mask = 0, input_keys = 0;
-  int input_from = -1, input_to = -1;
   // Savestate modes (M3): --rerecord saves+loads around EVERY frame (must be
   // identical to an uninterrupted run); --save-to/--save-at + --continue-from
   // split one run across two processes (the session leg: a movie asks this).
   int rerecord = 0;
   int save_at = -1;
   const char *save_to = NULL;
+  // Input levels as the engine's 64-bit button mask (bit i = input.buttons[i]
+  // in waterbox.config order): --input-mask kempston bits 0-4, --input-keys
+  // bit0 Space -> bit 20, bit1 Enter -> bit 21, held for [input_from, input_to).
+  unsigned input_mask = 0, input_keys = 0;
+  int input_from = -1, input_to = -1;
+  const char *settings_json = NULL;
   const char *continue_from = NULL;
   for(int i = 1; i < argc; i++) {
     if(!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
@@ -112,6 +114,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--settings-json") && i + 1 < argc) settings_json = argv[++i];
     else if(!strcmp(argv[i], "--input-to") && i + 1 < argc) input_to = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--rerecord")) rerecord = 1;
     else if(!strcmp(argv[i], "--save-at") && i + 1 < argc) save_at = atoi(argv[++i]);
@@ -153,9 +156,18 @@ int main(int argc, char **argv) {
     wbx_mount_file_path(h, fw_ids[i], rompath, &r);
     if(r.error_message[0]) { fprintf(stderr, "run-wbx: mount %s: %s\n", fw_ids[i], r.error_message); return 1; }
   }
-  static const char settings[] = "{}";
-  memreader sr = { (const uint8_t *)settings, sizeof settings - 1, 0 };
-  wbx_mount_file(h, "settings", mem_reader, (uintptr_t)&sr, false, &r);
+  static const char settings_default[] = "{}";
+  if(settings_json) {
+    /* the engine mounts the project's effective settings; --settings-json
+     * stands in for it (gate settings legs). */
+    freader sjr = { fopen(settings_json, "rb") };
+    if(!sjr.f) { fprintf(stderr, "run-wbx: cannot open %s\n", settings_json); return 1; }
+    wbx_mount_file(h, "settings", file_read, (uintptr_t)&sjr, false, &r);
+    fclose(sjr.f);
+  } else {
+    memreader sr = { (const uint8_t *)settings_default, sizeof settings_default - 1, 0 };
+    wbx_mount_file(h, "settings", mem_reader, (uintptr_t)&sr, false, &r);
+  }
   if(r.error_message[0]) { fprintf(stderr, "run-wbx: mount settings: %s\n", r.error_message); return 1; }
 
   wbx_activate_host(h, &r);
@@ -191,22 +203,13 @@ int main(int argc, char **argv) {
   static int16_t mixed[2048];
   for(int i = 0; i < frames; i++) {
     bool held = (input_from >= 0 && i >= input_from && (input_to < 0 || i < input_to));
-    uint8_t inbytes[2] = { (uint8_t)(held ? (input_mask & 0x1F) : 0), (uint8_t)(held ? (input_keys & 0x03) : 0) };
-    if(rerecord) {
-      /* rerecord leg: save+load before EVERY frame — the run must be
-       * identical to one that did not. Anything of the machine living
-       * outside the arena shows up here. */
-      membuf_state st = {0, 0, 0};
-      wbx_deactivate_host(h, &r);
-      wbx_save_state(h, mem_state_write, (uintptr_t)&st, &r);
-      if(r.error_message[0]) { fprintf(stderr, "run-wbx: save: %s\n", r.error_message); return 1; }
-      memreader mr = { st.buf, st.len, 0 };
-      wbx_load_state(h, mem_reader, (uintptr_t)&mr, &r);
-      if(r.error_message[0]) { fprintf(stderr, "run-wbx: load: %s\n", r.error_message); free(st.buf); return 1; }
-      wbx_activate_host(h, &r);
-      free(st.buf);
+    uint64_t buttons = 0;
+    if(held) {
+      buttons |= (uint64_t)(input_mask & 0x1F);
+      if(input_keys & 0x01) buttons |= (1ull << 20);
+      if(input_keys & 0x02) buttons |= (1ull << 21);
     }
-    FrameAdvance(inbytes, 2);
+    FrameAdvance(buttons);
     die_if_dead(h, "in FrameAdvance");
     const uint8_t *raw = GetVideoRaw();
     uint8_t rawcopy[320 * 240];

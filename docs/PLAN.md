@@ -209,3 +209,47 @@ Porting-doc mapping: item 4 (picture) was already done in M2 (ULA framebuffer re
    `ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main`.
 4. Row in chimera's `official-cores.json` + README core table
    (`id "unrealspeccyp"`, systems `["ZXS"]`).
+
+## M4 — the package (unofficial core)
+
+Unofficial: no roster row, no publish job (`.github/workflows/chimera.yml`
+is gate + contract tests only). Everything else in the porting-doc package
+step still applies: the declarations must be honest and the contract tests
+must pass, because the frontend believes the declarations.
+
+- Guest ABI fix (load-bearing): the engine calls `FrameAdvance(uint64_t)`
+  with button i = bit i of `input.buttons`, and optional `SetButton(int,int)`
+  deltas. The old 2-arg byte-pointer export would have failed to load under
+  the real engine (`proc("FrameAdvance", 1)`). `Machine::ApplyMask` is the
+  one input path in both flavors; `SetButtonByIndex` serves the delta export.
+- Buttons (22, order frozen — movie contract): Kempston, Sinclair (=upstream
+  SINCLAIR2 map 6/7/8/9/0), Cursor (=upstream CURSOR map 7/6/5/8/0), QAOP
+  (=upstream QAOPM map Q/A/O/P/M), Key.Space, Key.Enter. All presets are
+  upstream's own key mappings from `speccy_handler.cpp`; nothing invented.
+  Mnemonics: 22 distinct printable ASCII (contract test demands one letter
+  per button, unique per controller).
+- Settings (read in guest Init from the mounted settings JSON; same
+  `Machine::Configure` path in the native harness behind flags): mode48k
+  (bool), fastTape (bool, default on = upstream default), soundChip (enum
+  ay/ym). fastTape mirrors upstream exactly: step installed only while a
+  tape runs (delay-loop acceleration must never fire outside tape loads).
+  No tape content exists yet, so the step is a no-op in every leg so far.
+- Firmware: the 5 ROMs the loader asserts on, with sizes + uppercase SHA1s.
+  sos48.rom is always loaded (only *selected* in 48K mode).
+- file_slots.json: `formats` (not `extensions`), min 0 (bare BASIC boot is
+  valid — the gate proves it), max 1, game slot.
+- default_keybinds.json: Kempston on arrows+X, QAOP on its letters,
+  Space/Enter; Sinclair/Cursor unbound (picked in controller config).
+- package-licenses.json in the current schema (effectiveTerms
+  GPL-3.0-or-later, commercial use allowed): upstream GPL, tinyxml2/zlib,
+  minizip+zlib (always linked), miniBox MIT kit, guest libstdc++ (exception),
+  adapter GPL. Texts vendored under waterbox/licenses/.
+- build-package.sh now stamps version/versionDate, lays out licenses/ via
+  package-licenses.py, and zips dist/unrealspeccyp-<sha>.chimeraCore.
+- Contract tests (CHIMERA_CORES_DIR=dist): 26/26 pass locally
+  (InstalledCorePackagesTests + MnemonicUniquenessTests).
+- Repo hygiene per new-core.md §3: docs/BUILDING.md, AGENTS.md, CI at
+  .github/workflows/chimera.yml (root chimera.yml was never an Actions
+  path — moved).
+- Deferred: frontend gate (needs a real frontend run), per-game settings
+  (SuggestSettings/GetGameSettings — needs game content to be honest about).

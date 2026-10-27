@@ -94,24 +94,30 @@ int main(int argc, char** argv) {
   const char* clock = "virtual";
   int stall_ms = 0;
   int stall_at = -1;
-  // Input levels: --input-mask 0x1F held for frames [input-from, input-to).
-  // Same byte layout as the guest FrameAdvance input (bit0 Right, bit1
-  // Left, bit2 Down, bit3 Up, bit4 Fire), applied via the same
-  // Machine::SetInputMask — parity compares the identical path.
+  bool trace = false;
+  // Input levels as the engine's 64-bit button mask (bit i = input.buttons[i]
+  // in waterbox.config order): --input-mask 0x1F kempston bits held for
+  // frames [input-from, input-to); --input-keys bit0 Space -> bit 20,
+  // bit1 Enter -> bit 21. Applied via the same Machine::ApplyMask the guest
+  // uses — parity compares the identical path.
   unsigned input_mask = 0, input_keys = 0;
   int input_from = -1, input_to = -1;
-  bool trace = false;
+  bool mode48k = false, fastTape = true;
+  const char* soundChip = "ay";
   for(int i = 1; i < argc; i++) {
     if(!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--clock") && i + 1 < argc) clock = argv[++i];
     else if(!strcmp(argv[i], "--stall-ms") && i + 1 < argc) stall_ms = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--trace-instr")) trace = true;
     else if(!strcmp(argv[i], "--stall-at") && i + 1 < argc) stall_at = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--resdir") && i + 1 < argc) resdir_override = argv[++i];
-    else if(!strcmp(argv[i], "--trace-instr")) trace = true;
     else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--input-to") && i + 1 < argc) input_to = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--mode48k")) mode48k = true;
+    else if(!strcmp(argv[i], "--no-fast-tape")) fastTape = false;
+    else if(!strcmp(argv[i], "--sound-chip") && i + 1 < argc) soundChip = argv[++i];
     else if(!strcmp(argv[i], "--dump-video")) {} // kept: video is always hashed (M1)
     else if(!strcmp(argv[i], "--pull-audio")) {} // kept: audio is always pulled (M1)
     else if(!strcmp(argv[i], "--help")) {
@@ -141,6 +147,8 @@ int main(int argc, char** argv) {
   }
 
   Machine m;
+  int chip = (soundChip[0] == 'y' && soundChip[1] == 'm') ? 1 : 0;
+  m.Configure(mode48k, fastTape, chip);
   m.Reset();
   if(file) {
     if(!m.OpenFile(file, NULL, 0)) {
@@ -166,7 +174,14 @@ int main(int argc, char** argv) {
     if(host && !pacer.Next())
       continue; // DROP: wall-coupled catch-up skipped this machine frame
     bool held = (input_from >= 0 && f >= input_from && (input_to < 0 || f < input_to));
-    m.SetInputMask((uint8_t)(held ? (input_mask & 0x1F) : 0), (uint8_t)(held ? (input_keys & 0x03) : 0));
+    // Config-order mask bits: 0-4 kempston, 20 Space, 21 Enter.
+    uint64_t buttons = 0;
+    if(held) {
+      buttons |= (uint64_t)(input_mask & 0x1F);
+      if(input_keys & 0x01) buttons |= (1ull << 20);
+      if(input_keys & 0x02) buttons |= (1ull << 21);
+    }
+    m.ApplyMask(buttons);
     m.FrameAdvance();
     ++stepped;
     vclock.AdvanceFrames();
