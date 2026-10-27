@@ -3,10 +3,15 @@
 -- Job description comes from the USP_JOB env var file (key=value lines):
 --   frames=<N>          frames to advance after boot
 --   input=<hexmask>     64-bit button mask held every frame (bit i = input.buttons[i])
+--   extra=<N1,N2,...>   more buttons held every frame, by whole declared name
+--                       (bits past 52 cannot ride the mask: a Lua number is a
+--                       double, so the P5 keyboard comes through here)
 --   rerecord=0|1        save+load the whole machine around every frame
 --   shot=<path>         where to write the final screenshot (PNG)
 --   meta=<path>         where to write status=OK and the frame count
--- Button names follow waterbox.config input.buttons declaration order.
+-- Button order is waterbox.config input.buttons declaration order: P1
+-- Kempston, P2 Sinclair, P3 Cursor, P4 QAOP, console Space/Enter, then the
+-- P5 keyboard.
 local function writeAll(path, data)
   local f = assert(io.open(path, "wb"))
   f:write(data)
@@ -41,12 +46,18 @@ if emu.getsystemid() == nil then finish("ERROR", "no system id") end
 local frames = tonumber(job.frames) or 600
 local mask = tonumber(job.input or "0") or 0
 local names = {
-  "Kempston.Up", "Kempston.Down", "Kempston.Left", "Kempston.Right", "Kempston.Fire",
-  "Sinclair.Up", "Sinclair.Down", "Sinclair.Left", "Sinclair.Right", "Sinclair.Fire",
-  "Cursor.Up", "Cursor.Down", "Cursor.Left", "Cursor.Right", "Cursor.Fire",
-  "QAOP.Up", "QAOP.Down", "QAOP.Left", "QAOP.Right", "QAOP.Fire",
+  "P1 Up", "P1 Down", "P1 Left", "P1 Right", "P1 Fire",
+  "P2 Up", "P2 Down", "P2 Left", "P2 Right", "P2 Fire",
+  "P3 Up", "P3 Down", "P3 Left", "P3 Right", "P3 Fire",
+  "P4 Up", "P4 Down", "P4 Left", "P4 Right", "P4 Fire",
   "Key.Space", "Key.Enter",
 }
+local extra = {}
+if job.extra then
+  for name in (job.extra .. ","):gmatch("([^,]*),") do
+    if name ~= "" then extra[#extra + 1] = name end
+  end
+end
 local rerecord = (job.rerecord == "1")
 local stateId = nil
 if rerecord then stateId = memorysavestate.savecorestate() end
@@ -56,6 +67,7 @@ for i = 1, frames do
   for b = 0, #names - 1 do
     if math.floor(mask / (2 ^ b)) % 2 == 1 then buttons[names[b + 1]] = true end
   end
+  for _, name in ipairs(extra) do buttons[name] = true end
   if next(buttons) ~= nil then joypad.set(buttons) end
   emu.frameadvance()
   if rerecord then

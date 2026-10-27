@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
   // frames [input-from, input-to); --input-keys bit0 Space -> bit 20,
   // bit1 Enter -> bit 21. Applied via the same Machine::ApplyMask the guest
   // uses — parity compares the identical path.
-  unsigned input_mask = 0, input_keys = 0;
+  uint64_t input_mask = 0; unsigned input_keys = 0; // mask is full 64-bit: the P5 keyboard lives past bit 21
   int input_from = -1, input_to = -1;
   bool mode48k = false, fastTape = true;
   const char* soundChip = "ay";
@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
     else if(!strcmp(argv[i], "--trace-instr")) trace = true;
     else if(!strcmp(argv[i], "--stall-at") && i + 1 < argc) stall_at = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--resdir") && i + 1 < argc) resdir_override = argv[++i];
-    else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
+    else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = strtoull(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--input-to") && i + 1 < argc) input_to = atoi(argv[++i]);
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
     // Config-order mask bits: 0-4 kempston, 20 Space, 21 Enter.
     uint64_t buttons = 0;
     if(held) {
-      buttons |= (uint64_t)(input_mask & 0x1F);
+      buttons |= input_mask; // the whole declared set, P1 through P5
       if(input_keys & 0x01) buttons |= (1ull << 20);
       if(input_keys & 0x02) buttons |= (1ull << 21);
     }

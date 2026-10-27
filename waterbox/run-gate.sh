@@ -235,6 +235,19 @@ echo "gate leg m4-settings-parity: native=$SN48YM guest=$SG48"
 [ "$SN48YM" = "$SG48" ] || { echo "gate leg m4-settings-parity: FAILED — settings run differs across flavors" >&2; exit 1; }
 echo "gate leg m4-settings-parity: the settings channel reaches the machine identically in both flavors"
 
+echo "gate leg m4-boot-pages: firmware boots to the right ROM page"
+SAVED_RUN_CONTENT="$RUN_CONTENT"
+RUN_CONTENT=""
+FW128=$(state_of --frames 600 --clock virtual)
+FW128V=$(field_of /tmp/gate_last.log run-native vhash)
+FW48=$(state_of --frames 600 --clock virtual --mode48k)
+FW48V=$(field_of /tmp/gate_last.log run-native vhash)
+RUN_CONTENT="$SAVED_RUN_CONTENT"
+echo "gate leg m4-boot-pages: 128K vhash=$FW128V 48K vhash=$FW48V"
+[ "$FW128V" = "6626bf8fa8d724dd" ] || { echo "gate leg m4-boot-pages: FAILED — 128K firmware boot is not the 128 menu (service ROM instead?)" >&2; exit 1; }
+[ "$FW48V" = "006515fc83f702a1" ] || { echo "gate leg m4-boot-pages: FAILED — 48K firmware boot is not 48 BASIC" >&2; exit 1; }
+echo "gate leg m4-boot-pages: 128K menu and 48K BASIC, as upstream A_RESET selects"
+
 echo "gate leg m5-sna-parity: native 600f SNA vs guest 600f SNA must agree"
 SNA="$ROOT/test-content/boot48.sna"
 [ -f "$SNA" ] || { echo "gate leg m5-sna-parity: FAILED — $SNA missing (test-content is the distributable content)" >&2; exit 1; }
@@ -287,6 +300,31 @@ echo "gate leg m5-content-settings-parity: native=$NSNA48YM guest=$GS48"
 [ "$NSNA48YM" = "$GS48" ] || { echo "gate leg m5-content-settings-parity: FAILED — settings+content run differs across flavors" >&2; exit 1; }
 [ "$NSNA48YM" != "$NSNA" ] || { echo "gate leg m5-content-settings-parity: FAILED — settings changed nothing on content; the leg has no teeth" >&2; exit 1; }
 echo "gate leg m5-content-settings-parity: settings reach the content-booted machine identically in both flavors"
+echo "gate leg m6-kbd-alias-q: P5 Q (bit32) must drive the same key as QAOP Q (bit15)"
+RUN_CONTENT="$ROOT/test-content/boot48.sna"
+NQ15=$(state_of --frames 600 --clock virtual --input-mask 0x8000 --input-from 0 --input-to 600)
+NQ32=$(state_of --frames 600 --clock virtual --input-mask 0x100000000 --input-from 0 --input-to 600)
+echo "gate leg m6-kbd-alias-q: qaop-q=$NQ15 p5-q=$NQ32 plain=$NSNA"
+[ "$NQ32" != "$NSNA" ] || { echo "gate leg m6-kbd-alias-q: FAILED — P5 Q changed nothing; the leg has no teeth" >&2; exit 1; }
+[ "$NQ15" = "$NQ32" ] || { echo "gate leg m6-kbd-alias-q: FAILED — P5 Q is not the Q key (mapping wrong)" >&2; exit 1; }
+on_guest_host guest-legs.sh 600 $GGAME --input-mask 0x100000000 --input-from 0 --input-to 600
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GK=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m6-kbd-alias-q: native=$NQ32 guest=$GK"
+[ "$NQ32" = "$GK" ] || { echo "gate leg m6-kbd-alias-q: FAILED — keyboard run differs across flavors" >&2; exit 1; }
+
+echo "gate leg m6-kbd-alias-space: P5 Space (bit57) must drive the same key as Key.Space (bit20)"
+NS20=$(state_of --frames 600 --clock virtual --input-keys 0x1 --input-from 0 --input-to 600)
+NS57=$(state_of --frames 600 --clock virtual --input-mask 0x200000000000000 --input-from 0 --input-to 600)
+echo "gate leg m6-kbd-alias-space: key-space=$NS20 p5-space=$NS57 plain=$NSNA"
+[ "$NS57" != "$NSNA" ] || { echo "gate leg m6-kbd-alias-space: FAILED — P5 Space changed nothing; the leg has no teeth" >&2; exit 1; }
+[ "$NS20" = "$NS57" ] || { echo "gate leg m6-kbd-alias-space: FAILED — P5 Space is not the Space key (mapping wrong)" >&2; exit 1; }
+on_guest_host guest-legs.sh 600 $GGAME --input-mask 0x200000000000000 --input-from 0 --input-to 600
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GS=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m6-kbd-alias-space: native=$NS57 guest=$GS"
+[ "$NS57" = "$GS" ] || { echo "gate leg m6-kbd-alias-space: FAILED — keyboard run differs across flavors" >&2; exit 1; }
+echo "gate leg m6-kbd-alias-space: console and P5 aliases agree in both flavors"
 
 echo "gate leg m5-frontend: the real frontend boots content headless (boot/determinism/input/rerecord/keybinds)"
 if [ "$(uname -s)" = "Linux" ]; then

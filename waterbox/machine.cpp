@@ -45,7 +45,15 @@ void Machine::Configure(bool mode48k, bool fastTape, int soundChip) {
       soundChip == 1 ? eAY::CHIP_YM : eAY::CHIP_AY);
 }
 
-void Machine::Reset() { speccy->Reset(); }
+void Machine::Reset() {
+  speccy->Reset();
+  // Upstream A_RESET selects the 128K editor/menu page after reset when not
+  // in 48K mode (eRom::Reset leaves the service page mapped). Without this
+  // a firmware-only 128K boot strands in the service ROM. Tape/snapshot
+  // paths select their own page right after, exactly like upstream.
+  if(!speccy->Mode48k())
+    speccy->Device<eRom>()->SelectPage(eRom::ROM_128_1);
+}
 
 void Machine::FrameAdvance() {
   // Upstream installs the fast-tape step only while a tape runs (and takes
@@ -60,28 +68,70 @@ void Machine::FrameAdvance() {
 // Button table in waterbox.config input.buttons declaration order: bit i of
 // the engine's 64-bit mask. NEVER reorder (movie contract); append only, and
 // past 64 the SetButton export (below) is what carries the rest.
+// P1 Kempston, P2 Sinclair (=upstream SINCLAIR2 map 6/7/8/9/0), P3 Cursor
+// (=upstream CURSOR map 7/6/5/8/0), P4 QAOP (=upstream QAOPM map Q/A/O/P/M),
+// console Space/Enter aliases, P5 the full keyboard in upstream eKeyboard
+// matrix order.
 struct ButtonBinding { bool kbd; char key; };
 static const ButtonBinding kButtons[] = {
-  {false,'u'}, {false,'d'}, {false,'l'}, {false,'r'}, {false,'f'}, // Kempston U/D/L/R/Fire
-  {true,'9'}, {true,'8'}, {true,'6'}, {true,'7'}, {true,'0'},      // Sinclair (upstream SINCLAIR2 map)
-  {true,'7'}, {true,'6'}, {true,'5'}, {true,'8'}, {true,'0'},      // Cursor (upstream CURSOR map)
-  {true,'Q'}, {true,'A'}, {true,'O'}, {true,'P'}, {true,'M'},      // QAOP (upstream QAOPM map)
-  {true,' '}, {true,'e'},                                          // Key.Space, Key.Enter
+  {false,'u'}, {false,'d'}, {false,'l'}, {false,'r'}, {false,'f'}, // P1 Kempston U/D/L/R/Fire
+  {true,'9'}, {true,'8'}, {true,'6'}, {true,'7'}, {true,'0'},      // P2 Sinclair
+  {true,'7'}, {true,'6'}, {true,'5'}, {true,'8'}, {true,'0'},      // P3 Cursor
+  {true,'Q'}, {true,'A'}, {true,'O'}, {true,'P'}, {true,'M'},      // P4 QAOP
+  {true,' '}, {true,'e'},                                         // console Key.Space, Key.Enter
+  {true,'c'}, {true,'Z'}, {true,'X'}, {true,'C'}, {true,'V'},      // P5 keyboard row 7
+  {true,'A'}, {true,'S'}, {true,'D'}, {true,'F'}, {true,'G'},      // P5 row 6
+  {true,'Q'}, {true,'W'}, {true,'E'}, {true,'R'}, {true,'T'},      // P5 row 5
+  {true,'1'}, {true,'2'}, {true,'3'}, {true,'4'}, {true,'5'},      // P5 row 4
+  {true,'0'}, {true,'9'}, {true,'8'}, {true,'7'}, {true,'6'},      // P5 row 3
+  {true,'P'}, {true,'O'}, {true,'I'}, {true,'U'}, {true,'Y'},      // P5 row 2
+  {true,'e'}, {true,'L'}, {true,'K'}, {true,'J'}, {true,'H'},      // P5 row 1
+  {true,' '}, {true,'s'}, {true,'M'}, {true,'N'}, {true,'B'},      // P5 row 0
 };
 
 void Machine::SetButtonByIndex(int index, bool held) {
   if(index < 0 || index >= ButtonCount())
     return;
-  const ButtonBinding& b = kButtons[index];
-  if(b.kbd)
-    speccy->Device<eKeyboard>()->OnKey(b.key, held, false, false, false);
+  if(held)
+    lastMask |= (1ull << index);
   else
-    speccy->Device<eKempstonJoy>()->OnKey(b.key, held);
+    lastMask &= ~(1ull << index);
+  ApplyLastMask();
 }
 
 void Machine::ApplyMask(uint64_t mask) {
-  for(int i = 0; i < ButtonCount(); i++)
-    SetButtonByIndex(i, ((mask >> i) & 1ull) != 0);
+  lastMask = mask;
+  ApplyLastMask();
+}
+
+void Machine::ApplyLastMask() {
+  // Many buttons drive the same upstream key (every preset aliases P5 keys,
+  // and Key.Space/Enter alias P5 Space/Enter): the level is the OR over all
+  // of them, applied once per distinct key, so the last writer can never
+  // release a key another button still holds.
+  bool kbd[128] = {}, joy[128] = {};
+  for(int i = 0; i < ButtonCount(); i++) {
+    if(((lastMask >> i) & 1ull) == 0)
+      continue;
+    const ButtonBinding& b = kButtons[i];
+    (b.kbd ? kbd : joy)[(unsigned char)b.key] = true;
+  }
+  bool doneK[128] = {}, doneJ[128] = {};
+  for(int i = 0; i < ButtonCount(); i++) {
+    const ButtonBinding& b = kButtons[i];
+    unsigned char k = (unsigned char)b.key;
+    if(b.kbd) {
+      if(doneK[k])
+        continue;
+      doneK[k] = true;
+      speccy->Device<eKeyboard>()->OnKey(b.key, kbd[k], false, false, false);
+    } else {
+      if(doneJ[k])
+        continue;
+      doneJ[k] = true;
+      speccy->Device<eKempstonJoy>()->OnKey(b.key, joy[k]);
+    }
+  }
 }
 
 // MixedAudio: sum the three sources per sample like eSoundMixer::Update

@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
   // Input levels as the engine's 64-bit button mask (bit i = input.buttons[i]
   // in waterbox.config order): --input-mask kempston bits 0-4, --input-keys
   // bit0 Space -> bit 20, bit1 Enter -> bit 21, held for [input_from, input_to).
-  unsigned input_mask = 0, input_keys = 0;
+  uint64_t input_mask = 0; unsigned input_keys = 0; // mask is full 64-bit: the P5 keyboard lives past bit 21
   int input_from = -1, input_to = -1;
   const char *game = NULL;
   const char *settings_json = NULL;
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
       puts("usage: run-wbx [--frames N] [--resdir D] [--input-mask M] [--settings-json F] [--rerecord] [--save-at N --save-to FILE] [--continue-from FILE] [--game FILE] <core.wbx>");
       return 0;
     }
-    else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
+    else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = strtoull(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--settings-json") && i + 1 < argc) settings_json = argv[++i];
@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
     bool held = (input_from >= 0 && i >= input_from && (input_to < 0 || i < input_to));
     uint64_t buttons = 0;
     if(held) {
-      buttons |= (uint64_t)(input_mask & 0x1F);
+      buttons |= input_mask; // the whole declared set, P1 through P5
       if(input_keys & 0x01) buttons |= (1ull << 20);
       if(input_keys & 0x02) buttons |= (1ull << 21);
     }

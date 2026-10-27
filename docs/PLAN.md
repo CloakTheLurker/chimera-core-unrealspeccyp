@@ -316,3 +316,35 @@ end to end; the snapshot exercises xSnapshot::Load.
   sync combos, native vs guest parity on state+tstates+vhash+bhash+mhash.
   Manic Miner .tap + .sna: all 16 parities green; mode48k moves the TAP
   (teeth), the SNA's devices come from the image (parity is the assertion).
+  NOTE: inserted tapes do not auto-load (nothing types LOAD ""); the SNA is
+  the leg that executes real game code. A Manic Miner SNA + Kempston spot
+  check later confirmed game input parity too (native==guest, states diverge
+  from plain when Kempston is held).
+
+## 128K boot page + keyboard controller + column groups (2026-10-27)
+
+- 128K firmware boot stranded in the service ROM: eRom::Reset leaves ROM_SYS
+  mapped and nothing selected the SOS page. Upstream A_RESET selects
+  ROM_128_1 when not in 48K mode — Machine::Reset now mirrors it (tape and
+  snapshot paths select their own page right after, unchanged). Proven by
+  screenshot: 128K menu (Tape Loader/128 BASIC/Calculator/48 BASIC/TR-DOS)
+  vs 48 BASIC. Gate leg m4-boot-pages pins both firmware vhashes (pre-fix
+  128K vhash 844eda67... was the service screen).
+- Keyboard controller: P5, the full 40-key matrix in upstream eKeyboard
+  order (bits 22-61; total 62 <= 64). Key.Space/Key.Enter (bits 20/21)
+  alias P5 Space/Enter.
+- Columns group by type via P<n> prefixes (the only grouping mechanism):
+  P1 Kempston, P2 Sinclair, P3 Cursor, P4 QAOP, P5 keyboard, console
+  Key.Space/Key.Enter. Bit order of the first 22 is untouched (movie
+  contract); mnemonics kept per group (U/D/L/R/F, u/d/l/r/f, ^/v/</>/*,
+  QAOPM, S/E) with P5 keycaps (0-9A-Z_=^&).
+- Real bug the alias legs caught: preset buttons alias P5 keys, and the old
+  last-writer-wins ApplyMask released a key another button still held
+  (bit15 Q killed by unheld bit32). ApplyMask now ORs every upstream key
+  across all buttons driving it. Gate m6 legs prove P5 Q == QAOP Q and
+  P5 Space == Key.Space natively, with guest parity; the legs fail on the
+  old code (observed Q15==plain while Q32 perturbed).
+- Driver --input-mask is now full 64-bit (was masked to Kempston bits);
+  frontend keybinds leg holds all 62 (P5 by whole name, past Lua's float
+  range for bit math). default_keybinds: renamed presets + 1:1 keyboard
+  (Number0-9, letters, Space, Enter, merged Shift).

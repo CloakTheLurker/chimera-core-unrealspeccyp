@@ -18,9 +18,10 @@
 #                    machine through joypad + the declared input mnemonics.
 #  fe-rerecord ..... per-frame save+load around every frame equals the plain
 #                    run (the frontend savestate path is sound).
-#  fe-keybinds ..... all 22 declared mnemonics set at once: the run completes
-#                    (every name resolves through the real input pipeline) and
-#                    differs from the plain run.
+#  fe-keybinds ..... all 62 declared buttons set at once (bits 0-21 by mask,
+#                    the P5 keyboard by whole name past Lua's float range):
+#                    the run completes (every name resolves through the real
+#                    input pipeline) and differs from the plain run.
 # Settings reach the machine through the same mount the driver uses; that
 # channel is gated at driver level (m4/m5-content-settings-parity). Headless
 # sessions run package defaults, so there is no headless settings knob left
@@ -98,10 +99,20 @@ if [ -z "${DISPLAY:-}" ]; then
 fi
 U="$CORE/extern/upstream/res/rom"
 
-fe_run() { # <tag> <frames> <mask> <rerecord 0|1> — game positional LAST
-  _tag="$1"; _frames="$2"; _mask="$3"; _rr="$4"
-  printf 'frames=%s\ninput=%s\nrerecord=%s\nshot=%s/shot-%s.png\nmeta=%s/meta-%s.txt\n' \
-    "$_frames" "$_mask" "$_rr" "$W" "$_tag" "$W" "$_tag" > "$W/job-$_tag.txt"
+# The P5 keyboard names, read from the packaged declaration (never drifts
+# from waterbox.config): the keybinds leg holds every one every frame.
+P5KEYS=$(python3 - "$PKGDIR/waterbox.config" <<'PY'
+import json, sys
+cfg = json.load(open(sys.argv[1]))
+print(",".join(b for b in cfg["input"]["buttons"] if b.startswith("P5 ")))
+PY
+)
+case "$P5KEYS" in P5*) ;; *) echo "fe: FAILED — no P5 keys in $PKGDIR/waterbox.config" >&2; exit 1;; esac
+
+fe_run() { # <tag> <frames> <mask> <extra> <rerecord 0|1> — game positional LAST
+  _tag="$1"; _frames="$2"; _mask="$3"; _extra="$4"; _rr="$5"
+  printf 'frames=%s\ninput=%s\nextra=%s\nrerecord=%s\nshot=%s/shot-%s.png\nmeta=%s/meta-%s.txt\n' \
+    "$_frames" "$_mask" "$_extra" "$_rr" "$W" "$_tag" "$W" "$_tag" > "$W/job-$_tag.txt"
   rm -f "$W/shot-$_tag.png" "$W/meta-$_tag.txt"
   USP_JOB="$W/job-$_tag.txt" timeout 550 mono "$CHIMERA/build/Chimera.exe" --headless \
     "--config=$W/config.ini" "--core=$PKGDIR" \
@@ -120,7 +131,7 @@ fe_meta() { # <tag> <field>
 }
 
 echo "fe leg fe-boot: TAP boots through the real session pipeline"
-fe_run boot "$FRAMES" 0 0
+fe_run boot "$FRAMES" 0 "" 0
 [ "$(fe_meta boot status)" = "OK" ] || { echo "fe leg fe-boot: FAILED — $(cat "$W/meta-boot.txt" 2>/dev/null || echo NO-META)" >&2; exit 1; }
 [ "$(fe_meta boot frames)" = "$FRAMES" ] || { echo "fe leg fe-boot: FAILED — advanced $(fe_meta boot frames), want $FRAMES" >&2; exit 1; }
 [ -f "$W/shot-boot.png" ] || { echo "fe leg fe-boot: FAILED — no screenshot" >&2; exit 1; }
@@ -128,7 +139,7 @@ fe_run boot "$FRAMES" 0 0
 echo "fe leg fe-boot: system ZXS, $FRAMES frames, ram=$(fe_meta boot ram | cut -c1-16)..."
 
 echo "fe leg fe-determinism: the same boot twice gives identical machine hashes"
-fe_run repeat "$FRAMES" 0 0
+fe_run repeat "$FRAMES" 0 "" 0
 [ "$(fe_meta repeat status)" = "OK" ] || { echo "fe leg fe-determinism: FAILED — repeat run not OK" >&2; exit 1; }
 [ "$(fe_meta repeat ram)" = "$(fe_meta boot ram)" ] || { echo "fe leg fe-determinism: FAILED — RAM hashes differ" >&2; exit 1; }
 [ "$(fe_meta repeat vram)" = "$(fe_meta boot vram)" ] || { echo "fe leg fe-determinism: FAILED — VRAM hashes differ" >&2; exit 1; }
@@ -136,23 +147,23 @@ cmp -s "$W/shot-boot.png" "$W/shot-repeat.png" || { echo "fe leg fe-determinism:
 echo "fe leg fe-determinism: ram/vram/shots identical"
 
 echo "fe leg fe-input: Space+Enter held must change the machine (bits 20,21)"
-fe_run input "$FRAMES" 3145728 0
+fe_run input "$FRAMES" 3145728 "" 0
 [ "$(fe_meta input status)" = "OK" ] || { echo "fe leg fe-input: FAILED — input run not OK" >&2; exit 1; }
 [ "$(fe_meta input ram)" != "$(fe_meta boot ram)" ] || { echo "fe leg fe-input: FAILED — input changed nothing (RAM hash identical); the leg has no teeth" >&2; exit 1; }
 echo "fe leg fe-input: teeth confirmed (RAM hash differs)"
 
 echo "fe leg fe-rerecord: per-frame save+load must equal the plain run"
-fe_run rerecord "$FRAMES" 0 1
+fe_run rerecord "$FRAMES" 0 "" 1
 [ "$(fe_meta rerecord status)" = "OK" ] || { echo "fe leg fe-rerecord: FAILED — rerecord run not OK" >&2; exit 1; }
 [ "$(fe_meta rerecord ram)" = "$(fe_meta boot ram)" ] || { echo "fe leg fe-rerecord: FAILED — rerecord RAM differs" >&2; exit 1; }
 [ "$(fe_meta rerecord vram)" = "$(fe_meta boot vram)" ] || { echo "fe leg fe-rerecord: FAILED — rerecord VRAM differs" >&2; exit 1; }
 cmp -s "$W/shot-boot.png" "$W/shot-rerecord.png" || { echo "fe leg fe-rerecord: FAILED — rerecord screenshot differs" >&2; exit 1; }
 echo "fe leg fe-rerecord: ram/vram/shots equal the plain run"
 
-echo "fe leg fe-keybinds: all 22 declared mnemonics set at once"
-fe_run keybinds "$FRAMES" 4194303 0
+echo "fe leg fe-keybinds: all 62 declared buttons set at once"
+fe_run keybinds "$FRAMES" 4194303 "$P5KEYS" 0
 [ "$(fe_meta keybinds status)" = "OK" ] || { echo "fe leg fe-keybinds: FAILED — mnemonic run not OK (a declared name did not resolve)" >&2; exit 1; }
-[ "$(fe_meta keybinds ram)" != "$(fe_meta boot ram)" ] || { echo "fe leg fe-keybinds: FAILED — full-mask run identical to plain; the leg has no teeth" >&2; exit 1; }
-echo "fe leg fe-keybinds: all 22 mnemonics resolve, machine differs from plain"
+[ "$(fe_meta keybinds ram)" != "$(fe_meta boot ram)" ] || { echo "fe leg fe-keybinds: FAILED — full run identical to plain; the leg has no teeth" >&2; exit 1; }
+echo "fe leg fe-keybinds: all 62 buttons resolve, machine differs from plain"
 
 echo "fe: done (all legs green)."

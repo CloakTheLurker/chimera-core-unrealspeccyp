@@ -54,12 +54,18 @@ public:
   uint32_t MixedAudio(int16_t* stereo, uint32_t capacity);
   // The engine's button mask (bit i = input.buttons[i]), full level applied
   // every frame. Also the native harness path (it builds the same mask).
+  // Presets alias P5 keyboard keys (and Key.Space/Enter alias P5 Space/Enter):
+  // the level applied per upstream key is the OR over all buttons driving it,
+  // tracked in lastMask so the SetButton delta path and the full-mask path
+  // (and the per-frame refresh both repeat) agree.
   void ApplyMask(uint64_t mask);
   // One button by config index (the SetButton export's delta path).
   void SetButtonByIndex(int index, bool held);
   // Number of declared buttons (bit count of the mask).
-  static int ButtonCount() { return 22; }
+  static int ButtonCount() { return 62; }
 private:
   eSpeccy* speccy;
   bool fast_tape;
+  uint64_t lastMask = 0;
+  void ApplyLastMask();
 };
