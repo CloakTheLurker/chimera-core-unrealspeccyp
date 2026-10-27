@@ -3,10 +3,10 @@
     {
       "id": "game",
       "title": "Spectrum software",
-      "help": "The tape, disk or snapshot to boot: TZX/TAP, TRD/SCL/FDI and SNA/Z80/SZX snapshots, or a ZIP holding one of those.",
+      "help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those.",
       "min": 0,
       "max": 1,
-      "formats": ["tap", "tzx", "csw", "trd", "scl", "fdi", "td0", "udi", "sna", "z80", "szx", "rzx", "zip"]
+      "formats": ["tap", "tzx", "csw", "sna", "z80", "szx", "zip"]
     }
   ]
 }

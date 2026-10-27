@@ -24,6 +24,7 @@
 static Machine* g_machine = 0;
 static uint32_t g_bgra[320 * 240]; // == VideoWidth * VideoHeight (a static call is not a constant-expression)
 static int16_t g_audio[2048]; // > one frame (882 pairs) with headroom
+static uint32_t g_audioCount = 0; // stereo pairs in g_audio after the frame
 
 ECL_EXPORT bool Init(void) {
   g_machine = new Machine();
@@ -35,6 +36,32 @@ ECL_EXPORT bool Init(void) {
     soundChip = 1;
   g_machine->Configure(mode48k != 0, fastTape != 0, soundChip);
   g_machine->Reset();
+  // The engine mounts the game at waterbox.config romFile ("rom") with the
+  // real name under "rom.name" (session without a project uses the alias
+  // "/basename"); a project mounts slot files under their own names. Read
+  // rom.name when it exists and open that; without it, boot firmware-only.
+  char romname[512] = {0};
+  FILE* rf = fopen("rom.name", "rb");
+  if(rf) {
+    size_t n = fread(romname, 1, sizeof romname - 1, rf);
+    fclose(rf);
+    romname[n] = 0;
+    // A project mounts each slot file under its own name, so the bare name
+    // opens directly. A directly-opened rom is mounted at romFile ("rom")
+    // plus a "/basename" alias; rom.name carries one of those two spellings.
+    // Try all three: bare, /bare, then romFile.
+    char slashed[520];
+    slashed[0] = 0;
+    if(romname[0] != '/' && (strlen(romname) + 2 <= sizeof slashed))
+    {
+      slashed[0] = '/';
+      strcpy(slashed + 1, romname);
+    }
+    if(!g_machine->OpenFile(romname)
+        && !(slashed[0] && g_machine->OpenFile(slashed))
+        && !g_machine->OpenFile("rom"))
+      return false;
+  }
   return g_machine != 0;
 }
 
@@ -42,6 +69,11 @@ ECL_EXPORT bool Init(void) {
 ECL_EXPORT void FrameAdvance(uint64_t buttons) {
   g_machine->ApplyMask(buttons);
   g_machine->FrameAdvance();
+  // The engine reads audio as a pointer (GetAudio, no arguments) after the
+  // frame; the mix happens here so both flavors drain the sources at the
+  // same point (native run-native mixes right after its FrameAdvance too).
+  uint32_t wrote = g_machine->MixedAudio(g_audio, 2048);
+  g_audioCount = wrote / 2; // stereo pairs
 }
 
 // Per-button deltas the engine also sends (required past 64 buttons;
@@ -51,13 +83,16 @@ ECL_EXPORT void SetButton(int32_t index, int32_t value) {
     g_machine->SetButtonByIndex(index, value != 0);
 }
 
-ECL_EXPORT const uint32_t* GetVideoBgra(int32_t* w, int32_t* h) {
-  if(w) *w = Machine::VideoWidth();
-  if(h) *h = Machine::VideoHeight();
+ECL_EXPORT const uint32_t* GetVideoBgra(void) {
   usp_framebuffer_to_bgra((const uint8_t*)g_machine->Video(), g_bgra,
       Machine::VideoWidth() * Machine::VideoHeight());
   return g_bgra;
 }
+
+// The live size (same as the package declares; here so a reader never trusts
+// the declaration over the machine).
+ECL_EXPORT int32_t GetVideoWidth(void) { return Machine::VideoWidth(); }
+ECL_EXPORT int32_t GetVideoHeight(void) { return Machine::VideoHeight(); }
 
 // The raw indexed framebuffer (76800 bytes): the driver/parity leg compares
 // the machine, not just the converted picture.
@@ -65,14 +100,41 @@ ECL_EXPORT const uint8_t* GetVideoRaw(void) {
   return (const uint8_t*)g_machine->Video();
 }
 
-ECL_EXPORT uint32_t GetAudio(int16_t* stereo_interleaved, uint32_t capacity) {
-  if(!stereo_interleaved || !capacity)
-    return 0;
-  uint32_t n = capacity > 2048 ? 2048 : capacity;
-  uint32_t wrote = g_machine->MixedAudio(g_audio, n);
-  for(uint32_t i = 0; i < wrote; i++)
-    stereo_interleaved[i] = g_audio[i];
-  return wrote;
+// Self-described memory domains (guest ABI v1), queried after Init — sizes
+// may depend on settings, so there is no package-side table. Domain 0 is the
+// machine RAM (writable; 8 consecutive 16K pages), domain 1 the ULA
+// framebuffer (read-only: the machine redraws it every frame).
+ECL_EXPORT int32_t GetMemoryDomainCount(void) { return 2; }
+ECL_EXPORT const char* GetMemoryDomainName(int32_t i) {
+  if(i == 0) return "RAM";
+  if(i == 1) return "VRAM";
+  return 0;
+}
+ECL_EXPORT uint8_t* GetMemoryDomainPtr(int32_t i) {
+  if(!g_machine) return 0;
+  if(i == 0) return g_machine->RamBase();
+  if(i == 1) return (uint8_t*)g_machine->Video();
+  return 0;
+}
+ECL_EXPORT int64_t GetMemoryDomainSize(int32_t i) {
+  if(i == 0) return Machine::RamBytes();
+  if(i == 1) return Machine::VideoBytes();
+  return 0;
+}
+ECL_EXPORT int32_t GetMemoryDomainWritable(int32_t i) { return i == 0 ? 1 : 0; }
+
+// The frame's mixed audio (see FrameAdvance): the engine reads the pointer
+// (no arguments, like the video) and up to samplesPerFrame pairs from it.
+ECL_EXPORT const int16_t* GetAudio(void) {
+  return g_audio;
+}
+
+// How many stereo pairs GetAudio holds. The engine caps at samplesPerFrame
+// itself; the count here is the true one so the parity driver hashes exactly
+// what the native harness hashes (a snapshot load flushes ~882 extra samples
+// into frame 0, and truncating that would break parity, not keep it).
+ECL_EXPORT int32_t GetAudioSampleCount(void) {
+  return (int32_t)g_audioCount;
 }
 
 // The last mix, for drivers that read rather than pass a buffer.

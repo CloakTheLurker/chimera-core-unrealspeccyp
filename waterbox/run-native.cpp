@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
   m.Configure(mode48k, fastTape, chip);
   m.Reset();
   if(file) {
-    if(!m.OpenFile(file, NULL, 0)) {
+    if(!m.OpenFile(file)) {
       printf("run-native: cannot open %s (unsupported format)\n", file);
       return 1;
     }

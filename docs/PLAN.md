@@ -253,3 +253,52 @@ must pass, because the frontend believes the declarations.
   path — moved).
 - Deferred: frontend gate (needs a real frontend run), per-game settings
   (SuggestSettings/GetGameSettings — needs game content to be honest about).
+
+## M5 — content loading + frontend gate (DONE 2026-10-27)
+
+Test content is hand-built and distributable (no copyrighted bytes):
+test-content/boot.tap (a `10 REM` program; generator tests/make-boot-tap.py)
+and test-content/boot48.sna (48K snapshot booting to BASIC; generator
+tests/make-boot48-sna.py). The machine ROMs they boot are the declared
+firmware, mounted separately. tape auto-load exercises the guest tape path
+end to end; the snapshot exercises xSnapshot::Load.
+
+- Load path: native and guest share one (`Machine::OpenFile` ->
+  adapter-owned `OpenGameFile` in waterbox/file-types.cpp), calling the
+  same upstream entry points the UI handler's versions call
+  (eTape::Open, xSnapshot::Load) minus the UI parts. speccy_handler.cpp
+  (own eHandler + macros) is excluded from both builds; the stale-object
+  segfault it caused is why build-native.sh/guest-link.sh now force a full
+  rebuild when the TU list changes (script/series/pin marker).
+- Game discovery: the engine mounts the game at romFile ("rom", was
+  "core.wbx"), the same bytes under "/basename", and the name in
+  "rom.name"; run-wbx --game mounts all three and guest Init tries
+  bare, /bare, then romFile (project mounts need the bare spelling).
+- file_slots.json formats trimmed to what loads: tap,tzx,csw,sna,z80,szx,zip.
+- waterbox.config gained the extension->ZXS map (without it every
+  directly-opened file falls into the platform chooser, fatal headless).
+- Guest ABI corrections from the first real frontend boot: memory domains
+  are mandatory (RAM = 8 consecutive pages, read-write; VRAM = ULA screen,
+  read-only), and the engine calls GetVideoBgra/GetAudio with NO arguments
+  (pointer back; size from GetVideoWidth/Height and GetAudioSampleCount).
+  The old (w,h,buf) exports wrote through host pointers — a sandbox
+  violation that only the frontend run could show (run-wbx passed NULLs).
+- Parity bug the SNA leg caught: run-wbx capped the audio hash at 882 pairs
+  while native hashes the full frame-0 mix (a snapshot load flushes ~882
+  extra samples in). GetAudioSampleCount now returns the true count (the
+  engine caps playback itself); the driver hashes exactly what native
+  hashes. Per-frame fhash probes showed the core was bit-identical all
+  along; only the driver's accounting lied.
+- Gate m5 legs: TAP content rides every m2/m3 leg (guest takes --game as a
+  space-free basename staged under the guest build dir — the WSL
+  trampoline cannot carry spaced paths); SNA parity/repeat/input-teeth+parity/
+  settings-parity follow.
+- Frontend suite (waterbox/tests/run-frontend.sh via tools/wsl/fe-gate.sh,
+  mono+Xvfb, package dir + positional rom): boot (system ZXS, 600 frames,
+  RAM/VRAM hashes), determinism (hashes+shots identical), input teeth
+  (Space+Enter change the RAM hash — screenshots are blind to keyclicks,
+  so the teeth compare memory, proven by probe), rerecord, keybinds (all
+  22 mnemonics resolve live). joypad.set lands (probe showed get() state)
+  because the GUI frame loop consumes overrides around frameadvance.
+- Full gate green end to end; contract tests 26/26 on the fresh package.
+- Still deferred: per-game settings (SuggestSettings/GetGameSettings).

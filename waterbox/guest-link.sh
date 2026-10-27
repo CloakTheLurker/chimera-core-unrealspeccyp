@@ -68,6 +68,16 @@ GLIBS="-L$SYSROOT/lib -lstdc++ -lgcc -lgcc_eh -lc"
 # Same TU list as build-native.sh, plus the guest entry. C++ via g++, C via
 # musl-gcc (zlib is not C++-clean). -DWBX_GUEST enables the guest-only hooks.
 mkdir -p "$OUT/obj"
+# Same staleness rule as build-native.sh: numbering is positional, so a TU
+# list change (script edit, new patch, re-pin) forces a full rebuild that a
+# mtime check cannot see.
+TU_MARKER="$OUT/obj/tu-list.txt"
+TU_KEY="$(cksum "$CORE/waterbox/guest-link.sh" "$CORE/patches/series" "$CORE/extern/upstream.pin" 2>/dev/null || echo unhashable)"
+if [ ! -f "$TU_MARKER" ] || [ "$(cat "$TU_MARKER")" != "$TU_KEY" ]; then
+  echo "guest-link: TU list changed — full rebuild"
+  rm -f "$OUT/obj/"*.o
+  printf '%s' "$TU_KEY" > "$TU_MARKER"
+fi
 # Numbering is positional over a fixed TU order, so objects are resumable:
 # an .o newer than its source is kept. (A flag change needs rm obj/ by hand.)
 n=0
@@ -90,10 +100,13 @@ compile_c() {
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
   for f in "$UP/$d/"*.cpp; do
     [ -f "$f" ] || continue
+    # speccy_handler.cpp is the UI handler; game file types live in
+    # waterbox/file-types.cpp instead (see build-native.sh).
+    case "$(basename "$f")" in speccy_handler.cpp) continue;; esac
     compile_cxx "$f"
   done
 done
-for f in "$UP/3rdparty/tinyxml2/tinyxml2.cpp" "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp" "$CORE/waterbox/machine.cpp" "$CORE/waterbox/wbx-entry.cpp" "$CORE/waterbox/guest-syscalls.cpp"; do
+for f in "$UP/3rdparty/tinyxml2/tinyxml2.cpp" "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp" "$CORE/waterbox/machine.cpp" "$CORE/waterbox/file-types.cpp" "$CORE/waterbox/wbx-entry.cpp" "$CORE/waterbox/guest-syscalls.cpp"; do
   compile_cxx "$f"
 done
 for f in "$UP/3rdparty/minizip/ioapi.c" "$UP/3rdparty/minizip/unzip.c" "$UP"/3rdparty/zlib/*.c; do

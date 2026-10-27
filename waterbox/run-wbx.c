@@ -77,10 +77,11 @@ static void die_if_dead(mb_host *h, const char *when) {
 
 typedef int (MB_GUEST_ABI *bool_fn)(void);
 typedef void (MB_GUEST_ABI *frame_fn)(uint64_t);
-typedef const uint32_t *(MB_GUEST_ABI *bgra_fn)(int32_t *, int32_t *);
+typedef const uint32_t *(MB_GUEST_ABI *bgra_fn)(void);
 typedef const uint8_t *(MB_GUEST_ABI *raw_fn)(void);
-typedef uint32_t (MB_GUEST_ABI *audio_fn)(int16_t *, uint32_t);
+typedef const int16_t *(MB_GUEST_ABI *audio_fn)(void);
 typedef const int16_t *(MB_GUEST_ABI *audiobuf_fn)(void);
+typedef int32_t (MB_GUEST_ABI *audiocount_fn)(void);
 typedef uint64_t (MB_GUEST_ABI *tstates_fn)(void);
 
 static const char *fw_ids[5] = {
@@ -102,13 +103,14 @@ int main(int argc, char **argv) {
   // bit0 Space -> bit 20, bit1 Enter -> bit 21, held for [input_from, input_to).
   unsigned input_mask = 0, input_keys = 0;
   int input_from = -1, input_to = -1;
+  const char *game = NULL;
   const char *settings_json = NULL;
   const char *continue_from = NULL;
   for(int i = 1; i < argc; i++) {
     if(!strcmp(argv[i], "--frames") && i + 1 < argc) frames = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--resdir") && i + 1 < argc) resdir = argv[++i];
     else if(!strcmp(argv[i], "--help")) {
-      printf("usage: run-wbx [--frames N] [--resdir D] [--input-mask M] [--rerecord] [--save-at N --save-to FILE] [--continue-from FILE] <core.wbx>");
+      puts("usage: run-wbx [--frames N] [--resdir D] [--input-mask M] [--settings-json F] [--rerecord] [--save-at N --save-to FILE] [--continue-from FILE] [--game FILE] <core.wbx>");
       return 0;
     }
     else if(!strcmp(argv[i], "--input-mask") && i + 1 < argc) input_mask = (unsigned)strtoul(argv[++i], NULL, 0);
@@ -120,6 +122,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[i], "--save-at") && i + 1 < argc) save_at = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--save-to") && i + 1 < argc) save_to = argv[++i];
     else if(!strcmp(argv[i], "--continue-from") && i + 1 < argc) continue_from = argv[++i];
+    else if(!strcmp(argv[i], "--game") && i + 1 < argc) game = argv[++i];
     else wbx = argv[i];
   }
   if(!wbx) { fprintf(stderr, "run-wbx: need <core.wbx>\n"); return 1; }
@@ -169,6 +172,26 @@ int main(int argc, char **argv) {
     wbx_mount_file(h, "settings", mem_reader, (uintptr_t)&sr, false, &r);
   }
   if(r.error_message[0]) { fprintf(stderr, "run-wbx: mount settings: %s\n", r.error_message); return 1; }
+  if(game) {
+    /* like the engine's session open: the game at romFile ("rom"), the same
+     * bytes under the real name as an alias, and that name in "rom.name"
+     * (guest Init reads rom.name; without a game it boots firmware-only). */
+    const char* base = strrchr(game, '/');
+#ifdef _WIN32
+    const char *bs = strrchr(game, 92);
+    if(bs != NULL && (base == NULL || bs > base)) base = bs;
+#endif
+    base = base != NULL ? base + 1 : game;
+    static char alias[4096];
+    snprintf(alias, sizeof alias, "/%s", base);
+    wbx_mount_file_path(h, "rom", game, &r);
+    if(r.error_message[0]) { fprintf(stderr, "run-wbx: mount rom: %s\n", r.error_message); return 1; }
+    wbx_mount_file_path(h, alias, game, &r);
+    if(r.error_message[0]) { fprintf(stderr, "run-wbx: mount %s: %s\n", alias, r.error_message); return 1; }
+    memreader nrr = { (const uint8_t *)alias + 1, strlen(alias + 1) + 1, 0 };
+    wbx_mount_file(h, "rom.name", mem_reader, (uintptr_t)&nrr, false, &r);
+    if(r.error_message[0]) { fprintf(stderr, "run-wbx: mount rom.name: %s\n", r.error_message); return 1; }
+  }
 
   wbx_activate_host(h, &r);
   if(!((bool_fn)proc(h, "Init"))()) { die_if_dead(h, "in Init"); fprintf(stderr, "run-wbx: Init returned false\n"); return 1; }
@@ -194,13 +217,13 @@ int main(int argc, char **argv) {
   raw_fn GetVideoRaw = (raw_fn)proc(h, "GetVideoRaw");
   audio_fn GetAudio = (audio_fn)proc(h, "GetAudio");
   audiobuf_fn GetAudioBuf = (audiobuf_fn)proc(h, "GetAudioBuf");
+  audiocount_fn GetAudioSampleCount = (audiocount_fn)proc(h, "GetAudioSampleCount");
   tstates_fn GetTStates = (tstates_fn)proc(h, "GetTStates");
 
   const uint64_t FNV_SEED = 1469598103934665603ULL;
   uint64_t vhash = FNV_SEED, bhash = FNV_SEED, mhash = FNV_SEED;
   uint64_t lvhash = FNV_SEED, lmhash = FNV_SEED; // last-frame only: the session leg compares these + tstates
   static uint32_t bgra[320 * 240];
-  static int16_t mixed[2048];
   for(int i = 0; i < frames; i++) {
     bool held = (input_from >= 0 && i >= input_from && (input_to < 0 || i < input_to));
     uint64_t buttons = 0;
@@ -216,17 +239,19 @@ int main(int argc, char **argv) {
     memcpy(rawcopy, raw, sizeof rawcopy);
     vhash = fnv1a(rawcopy, sizeof rawcopy, vhash);
     lvhash = fnv1a(rawcopy, sizeof rawcopy, FNV_SEED);
-    const uint32_t *g = GetVideoBgra(NULL, NULL);
+    const uint32_t *g = GetVideoBgra();
     memcpy(bgra, g, sizeof bgra);
     bhash = fnv1a(bgra, sizeof bgra, bhash);
-    /* engine path (host buffer through the export) and direct read must agree */
-    uint32_t wrote = GetAudio(mixed, 2048);
+    /* engine path (pointer the export hands out) and direct read must agree */
+    int32_t nsamp = GetAudioSampleCount();
+    if(nsamp < 0) nsamp = 0;
+    const int16_t *mixed = GetAudio();
     const int16_t *direct = GetAudioBuf();
-    if(wrote && memcmp(mixed, direct, wrote * sizeof(int16_t)) != 0) {
+    if(nsamp && memcmp(mixed, direct, (size_t)nsamp * 2 * sizeof(int16_t)) != 0) {
       fprintf(stderr, "run-wbx: GetAudio disagrees with GetAudioBuf at frame %d\n", i);
       return 1;
     }
-    if(wrote) { mhash = fnv1a(mixed, wrote * sizeof(int16_t), mhash); lmhash = fnv1a(mixed, wrote * sizeof(int16_t), FNV_SEED); }
+    if(nsamp) { mhash = fnv1a(mixed, (size_t)nsamp * 2 * sizeof(int16_t), mhash); lmhash = fnv1a(mixed, (size_t)nsamp * 2 * sizeof(int16_t), FNV_SEED); }
     if(save_to && save_at >= 0 && i == save_at) {
       /* session leg, first process: freeze the machine mid-run to a file */
       FILE *sf = fopen(save_to, "wb");

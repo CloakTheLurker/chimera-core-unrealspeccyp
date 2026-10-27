@@ -25,6 +25,18 @@ UP="$ROOT/build/upstream-patched"
 OBJ="$OUT/obj"
 mkdir -p "$OUT" "$OBJ"
 
+# Numbering is positional over a fixed TU order, so objects are resumable:
+# an .o newer than its source is kept. A TU-list change (script edit, new
+# patch, upstream re-pin) renumbers everything, so a marker over the script,
+# the patch series and the upstream pin forces the full rebuild that a mtime
+# check cannot see (a stale object would otherwise link silently).
+TU_MARKER="$OBJ/tu-list.txt"
+TU_KEY="$(cksum "$HERE/build-native.sh" "$ROOT/patches/series" "$ROOT/extern/upstream.pin" 2>/dev/null || echo unhashable)"
+if [ ! -f "$TU_MARKER" ] || [ "$(cat "$TU_MARKER")" != "$TU_KEY" ]; then
+  echo "build-native: TU list changed — full rebuild"
+  rm -f "$OBJ"/*.o
+  printf '%s' "$TU_KEY" > "$TU_MARKER"
+fi
 "$HERE/apply-patches.sh" "$U" "$UP"
 
 CXX=${CXX:-g++}
@@ -63,10 +75,13 @@ compile_c() {
 for d in "" z80 tools snapshot devices devices/fdd devices/input devices/sound; do
   for f in "$UP/$d/"*.cpp; do
     [ -f "$f" ] || continue
+    # speccy_handler.cpp is the UI handler (own eHandler + macros + dialogs);
+    # game file types live in waterbox/file-types.cpp instead.
+    case "$(basename "$f")" in speccy_handler.cpp) continue;; esac
     compile_cxx "$f"
   done
 done
-for f in "$UP/3rdparty/tinyxml2/tinyxml2.cpp" "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp" "$HERE/machine.cpp" "$HERE/run-native.cpp"; do
+for f in "$UP/3rdparty/tinyxml2/tinyxml2.cpp" "$UP/platform/platform.cpp" "$UP/platform/io.cpp" "$UP/platform/linux/io_select_linux.cpp" "$HERE/machine.cpp" "$HERE/file-types.cpp" "$HERE/run-native.cpp"; do
   compile_cxx "$f"
 done
 for f in "$UP/3rdparty/minizip/ioapi.c" "$UP/3rdparty/minizip/unzip.c"; do

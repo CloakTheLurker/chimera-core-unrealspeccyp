@@ -5,7 +5,7 @@
 #include "std.h"
 #include "machine.h"
 #include "speccy.h"
-#include "file_type.h"
+#include "file-types.h"
 #include "devices/memory.h"
 #include "devices/ula.h"
 #include "devices/input/keyboard.h"
@@ -19,16 +19,13 @@
 uint64_t Machine::TStates() const { return speccy->T(); }
 uint32_t Machine::FrameTacts() const { return speccy->CPU()->FrameTacts(); }
 const void* Machine::Video() const { return speccy->Device<eUla>()->Screen(); }
+uint8_t* Machine::RamBase() { return (uint8_t*)speccy->Memory()->Get(eMemory::P_RAM0); }
 
-bool Machine::OpenFile(const char* path, const void* data, size_t size) {
-  const xPlatform::eFileType* t = xPlatform::eFileType::FindByName(path);
-  if(!t || !t->AbleOpen())
-    return false;
-  if(data && size)
-    return t->Open(data, size);
-  return t->Open(path);
+
+
+bool Machine::OpenFile(const char* path) {
+  return xPlatform::OpenGameFile(speccy, path);
 }
-
 static eDeviceSound* SoundDev(eSpeccy* speccy, int s) {
   if(s == 0) return speccy->Device<eBeeper>();
   if(s == 1) return speccy->Device<eAY>();
@@ -38,8 +35,6 @@ int Machine::AudioSources() { return 3; }
 const void* Machine::AudioData(int source) { return SoundDev(speccy, source)->AudioData(); }
 uint32_t Machine::AudioDataReady(int source) { return SoundDev(speccy, source)->AudioDataReady(); }
 void Machine::AudioDataUse(int source, uint32_t size) { SoundDev(speccy, source)->AudioDataUse(size); }
-
-
 Machine::Machine() : speccy(new eSpeccy), fast_tape(true) {}
 Machine::~Machine() { delete speccy; }
 

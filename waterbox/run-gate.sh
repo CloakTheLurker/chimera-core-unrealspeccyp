@@ -46,6 +46,16 @@ else
   echo "gate: content: (none — firmware boot: in-tree res/rom + step, no distributable content needed)"
   RUN_CONTENT=""
 fi
+# The WSL trampoline cannot carry spaced paths, so the guest legs take the
+# game as a space-free basename staged under the guest build dir (resolved
+# inside WSL by guest-legs.sh).
+GGAME=""
+if [ -n "$RUN_CONTENT" ]; then
+  mkdir -p "$ROOT/build/guest"
+  cp "$RUN_CONTENT" "$ROOT/build/guest/"
+  GGAME="--game $(basename "$RUN_CONTENT")"
+  echo "gate: guest game: $GGAME"
+fi
 
 # Run a tools/wsl/ leg on the guest-capable host: directly on Linux, via WSL
 # (launch-and-poll through wsl-call.sh — see build-guest.sh for why).
@@ -68,13 +78,19 @@ on_guest_host() {
     case "$_script" in
       check-wbx.sh) wsl_call "$_script" "$*" "clean (no TLS" "$ROOT/build/guest/check-wbx.log" 300;;
       guest-legs.sh) wsl_call "$_script" "$*" "^run-wbx " "$ROOT/build/guest/guest-legs.log" 900;;
+      fe-gate.sh) wsl_call "$_script" "$*" "fe: done" "$ROOT/build/guest/fe-gate.log" 1500;;
       *) echo "gate: no marker for WSL leg $_script" >&2; exit 1;;
     esac
   fi
 }
 state_of() {
   # state_of <run-native args...>: prints the state= hex of the summary line
-  "$NATIVE" "$@" $RUN_CONTENT | tee /tmp/gate_last.log | sed -n 's/^run-native .* state=\([0-9a-f]*\) .*$/\1/p'
+  # (RUN_CONTENT is quoted: the tree lives under "Chimera Dev").
+  if [ -n "$RUN_CONTENT" ]; then
+    "$NATIVE" "$@" "$RUN_CONTENT" | tee /tmp/gate_last.log | sed -n 's/^run-native .* state=\([0-9a-f]*\) .*$/\1/p'
+  else
+    "$NATIVE" "$@" | tee /tmp/gate_last.log | sed -n 's/^run-native .* state=\([0-9a-f]*\) .*$/\1/p'
+  fi
 }
 summary_of() { sed -n 's/^run-native \(.*\)$/\1/p' /tmp/gate_last.log; }
 # field_of <file> <prefix> <field>: value of field= on the prefix's summary line
@@ -143,7 +159,7 @@ NB=$(field_of /tmp/gate_last.log run-native bhash)
 NM=$(field_of /tmp/gate_last.log run-native mhash)
 echo "gate leg m2-parity: native: $(summary_of)"
 WBXLOG="$ROOT/build/guest/guest-legs.log"
-on_guest_host guest-legs.sh 600
+on_guest_host guest-legs.sh 600 $GGAME
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 SG=$(field_of /tmp/gate_wbx.log guest state)
 GT=$(field_of /tmp/gate_wbx.log guest tstates)
@@ -168,14 +184,14 @@ echo "gate leg m3-input-teeth: no-input=$S0 input=$SNK"
 if [ "$SNK" = "$S0" ]; then echo "gate leg m3-input-teeth: FAILED — input changed nothing; the leg has no teeth" >&2; exit 1; fi
 
 echo "gate leg m3-input-parity: guest with Space+Enter 600f must agree with native"
-on_guest_host guest-legs.sh 600 --input-keys 0x3 --input-from 0 --input-to 600
+on_guest_host guest-legs.sh 600 $GGAME --input-keys 0x3 --input-from 0 --input-to 600
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GK=$(field_of /tmp/gate_wbx.log guest state)
 echo "gate leg m3-input-parity: native=$SNK guest=$GK"
 [ "$SNK" = "$GK" ] || { echo "gate leg m3-input-parity: FAILED — input run differs across flavors" >&2; exit 1; }
 
 echo "gate leg m3-rerecord: guest save+load around EVERY frame must equal a plain run"
-on_guest_host guest-legs.sh 600 --rerecord
+on_guest_host guest-legs.sh 600 $GGAME --rerecord
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GR=$(field_of /tmp/gate_wbx.log guest state)
 echo "gate leg m3-rerecord: plain=$SG rerecord=$GR"
@@ -190,8 +206,8 @@ if [ "$(uname -s)" != "Linux" ]; then
   sleep 10
 fi
 echo "gate leg m3-session: save at frame 299 in one process, continue 300 in another"
-on_guest_host guest-legs.sh 300 --save-at 299 --save-to /home/cloak/m3-session.state
-on_guest_host guest-legs.sh 300 --continue-from /home/cloak/m3-session.state
+on_guest_host guest-legs.sh 300 $GGAME --save-at 299 --save-to /home/cloak/m3-session.state
+on_guest_host guest-legs.sh 300 $GGAME --continue-from /home/cloak/m3-session.state
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 CT=$(field_of /tmp/gate_wbx.log guest tstates)
 CLV=$(field_of /tmp/gate_wbx.log guest lvhash)
@@ -212,11 +228,74 @@ echo "gate leg m4-settings-parity: guest with mode48k+ym agrees with native"
 printf '{"mode48k": true, "soundChip": "ym"}' > "$ROOT/build/guest/m48ym.json"
 SN48YM=$(state_of --frames 600 --clock virtual --mode48k --sound-chip ym)
 echo "gate leg m4-settings-parity: native: $(summary_of)"
-on_guest_host guest-legs.sh 600 --settings-json m48ym.json
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m48ym.json
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 SG48=$(field_of /tmp/gate_wbx.log guest state)
 echo "gate leg m4-settings-parity: native=$SN48YM guest=$SG48"
 [ "$SN48YM" = "$SG48" ] || { echo "gate leg m4-settings-parity: FAILED — settings run differs across flavors" >&2; exit 1; }
 echo "gate leg m4-settings-parity: the settings channel reaches the machine identically in both flavors"
+
+echo "gate leg m5-sna-parity: native 600f SNA vs guest 600f SNA must agree"
+SNA="$ROOT/test-content/boot48.sna"
+[ -f "$SNA" ] || { echo "gate leg m5-sna-parity: FAILED — $SNA missing (test-content is the distributable content)" >&2; exit 1; }
+RUN_CONTENT="$SNA"
+cp "$SNA" "$ROOT/build/guest/"
+GGAME="--game $(basename "$SNA")"
+NSNA=$(state_of --frames 600 --clock virtual)
+NT=$(field_of /tmp/gate_last.log run-native tstates)
+NV=$(field_of /tmp/gate_last.log run-native vhash)
+NB=$(field_of /tmp/gate_last.log run-native bhash)
+NM=$(field_of /tmp/gate_last.log run-native mhash)
+echo "gate leg m5-sna-parity: native: $(summary_of)"
+on_guest_host guest-legs.sh 600 $GGAME
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GS=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m5-sna-parity: native=$NSNA guest=$GS"
+mismatch=0
+[ "$NSNA" = "$GS" ] || { echo "gate leg m5-sna-parity: FAILED — state differs" >&2; mismatch=1; }
+[ "$NT" = "$(field_of /tmp/gate_wbx.log guest tstates)" ] || { echo "gate leg m5-sna-parity: FAILED — tstates differ" >&2; mismatch=1; }
+[ "$NV" = "$(field_of /tmp/gate_wbx.log guest vhash)" ] || { echo "gate leg m5-sna-parity: FAILED — vhash differs" >&2; mismatch=1; }
+[ "$NB" = "$(field_of /tmp/gate_wbx.log guest bhash)" ] || { echo "gate leg m5-sna-parity: FAILED — bhash differs" >&2; mismatch=1; }
+[ "$NM" = "$(field_of /tmp/gate_wbx.log guest mhash)" ] || { echo "gate leg m5-sna-parity: FAILED — mhash differs" >&2; mismatch=1; }
+[ "$mismatch" = "0" ] || exit 1
+echo "gate leg m5-sna-parity: the snapshot path is bit-identical across flavors"
+
+echo "gate leg m5-content-repeat: two SNA runs must agree (cross-process)"
+NSNA2=$(state_of --frames 600 --clock virtual)
+echo "gate leg m5-content-repeat: run1=$NSNA run2=$NSNA2"
+[ "$NSNA" = "$NSNA2" ] || { echo "gate leg m5-content-repeat: FAILED — content run is nondeterministic" >&2; exit 1; }
+
+echo "gate leg m5-content-input-teeth: Space+Enter held 600f must perturb the SNA run"
+NSNAK=$(state_of --frames 600 --clock virtual --input-keys 0x3 --input-from 0 --input-to 600)
+echo "gate leg m5-content-input-teeth: no-input=$NSNA input=$NSNAK"
+[ "$NSNAK" != "$NSNA" ] || { echo "gate leg m5-content-input-teeth: FAILED — input changed nothing on content; the leg has no teeth" >&2; exit 1; }
+
+echo "gate leg m5-content-input-parity: guest with Space+Enter 600f on SNA must agree with native"
+on_guest_host guest-legs.sh 600 $GGAME --input-keys 0x3 --input-from 0 --input-to 600
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GK=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m5-content-input-parity: native=$NSNAK guest=$GK"
+[ "$NSNAK" = "$GK" ] || { echo "gate leg m5-content-input-parity: FAILED — content input run differs across flavors" >&2; exit 1; }
+
+echo "gate leg m5-content-settings-parity: guest with mode48k+ym on SNA agrees with native"
+NSNA48YM=$(state_of --frames 600 --clock virtual --mode48k --sound-chip ym)
+echo "gate leg m5-content-settings-parity: native: $(summary_of)"
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m48ym.json
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GS48=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m5-content-settings-parity: native=$NSNA48YM guest=$GS48"
+[ "$NSNA48YM" = "$GS48" ] || { echo "gate leg m5-content-settings-parity: FAILED — settings+content run differs across flavors" >&2; exit 1; }
+[ "$NSNA48YM" != "$NSNA" ] || { echo "gate leg m5-content-settings-parity: FAILED — settings changed nothing on content; the leg has no teeth" >&2; exit 1; }
+echo "gate leg m5-content-settings-parity: settings reach the content-booted machine identically in both flavors"
+
+echo "gate leg m5-frontend: the real frontend boots content headless (boot/determinism/input/rerecord/keybinds)"
+if [ "$(uname -s)" = "Linux" ]; then
+  sh "$ROOT/waterbox/tests/run-frontend.sh" 2>&1 | tee "$ROOT/build/guest/fe-gate.log"
+  grep -q "fe: done" "$ROOT/build/guest/fe-gate.log" || { echo "gate leg m5-frontend: FAILED — frontend suite did not finish green" >&2; exit 1; }
+else
+  on_guest_host fe-gate.sh
+  grep -q "fe: done" "$ROOT/build/guest/fe-gate.log" || { echo "gate leg m5-frontend: FAILED — frontend suite did not finish green" >&2; exit 1; }
+  grep -h "^fe leg" "$ROOT/build/guest/fe-gate.log"
+fi
 
 echo "gate: done (all legs green)."

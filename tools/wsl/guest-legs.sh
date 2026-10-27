@@ -21,6 +21,19 @@ while [ $# -gt 0 ]; do
     esac
     ARGS="$ARGS --settings-json $SJ"
     shift || true
+  elif [ "$1" = "--game" ]; then
+    shift
+    # A bare basename resolves under the guest build dir (the gate stages
+    # test-content there and passes a space-free basename, since the WSL
+    # trampoline cannot carry spaced paths). An absolute/relative path with
+    # a slash is used as-is. Either way the bytes land space-free under
+    # /home/cloak (survives wsl -t) keeping the extension the guest loader
+    # dispatches on.
+    case "$1" in */*) SRC="$1";; *) SRC="$GUEST_DIR/$1";; esac
+    GB="/home/cloak/$(basename "$SRC")"
+    if [ "$SRC" != "$GB" ]; then cp "$SRC" "$GB"; fi
+    ARGS="$ARGS --game $GB"
+    shift || true
   else
     ARGS="$ARGS $1"
     shift || true

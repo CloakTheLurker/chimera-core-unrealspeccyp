@@ -35,7 +35,15 @@ public:
   static int VideoWidth() { return 320; }
   static int VideoHeight() { return 240; }
   static int VideoBytes() { return 320 * 240; }
-  bool OpenFile(const char* path, const void* data, size_t size);
+  // The machine RAM pages, consecutive P_RAM0..P_RAM7: the engine's memory
+  // domain 0 (writable). Domain 1 is Video() (read-only: the ULA redraws it
+  // every frame). Pointers hold for the session (the machine is never freed
+  // before the session ends).
+  uint8_t* RamBase();
+  static int RamBytes() { return 8 * 16384; }
+  // Load the game file at path (native: host path; guest: mounted name).
+  // Firmware-only boot when no game is present.
+  bool OpenFile(const char* path);
   int AudioSources();                    // 3: beeper, AY, tape
   const void* AudioData(int source);
   uint32_t AudioDataReady(int source);   // bytes
