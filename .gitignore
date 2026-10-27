@@ -7,3 +7,4 @@ core.wbx
 *.zip
 .DS_Store
 waterbox/tests/work/
+ROMs/

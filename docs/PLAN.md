@@ -302,3 +302,17 @@ end to end; the snapshot exercises xSnapshot::Load.
   because the GUI frame loop consumes overrides around frameadvance.
 - Full gate green end to end; contract tests 26/26 on the fresh package.
 - Still deferred: per-game settings (SuggestSettings/GetGameSettings).
+
+## Firmware hashes + Manic Miner matrix (2026-10-27, on top of M5)
+
+- The five firmware SHA1s in waterbox.config were corrupted hand
+  transcriptions (dropped characters); sizes matched, so every file graded
+  Unrecognised ("a dump the core has never seen") while the core booted
+  fine (it never checks hashes — only the frontend survey does). Fixed by
+  stamping all five programmatically from extern/upstream/res/rom/ and
+  verifying GOOD. Lesson: hashes are never typed by hand.
+- waterbox/tests/run-rom-matrix.sh (local-only, never CI — ROMs/ is
+  gitignored, copyrighted files stay untracked): each given game × all 8
+  sync combos, native vs guest parity on state+tstates+vhash+bhash+mhash.
+  Manic Miner .tap + .sna: all 16 parities green; mode48k moves the TAP
+  (teeth), the SNA's devices come from the image (parity is the assertion).
