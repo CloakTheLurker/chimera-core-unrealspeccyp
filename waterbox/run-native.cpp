@@ -87,6 +87,35 @@ static const char* FindResDir(const char* argv0, char* buf, size_t len) {
   return NULL;
 }
 
+// --type/--type-file: type a string for movies (one key press per char:
+// 4f hold, 8f gap, first press at --type-at (default frame 100, when the
+// boot prompt is up and the tape pilot still runs). One schedule for both
+// flavors, so native-vs-guest parity compares identical input.
+// '"' is Symbol Shift+P held together (the Symbol Shift proof); '\n' is
+// Enter; lowercase folds to uppercase (the Spectrum has no lowercase).
+// The schedule ORs with the --input-mask/--input-keys windows.
+static int p5pos_type(unsigned char c) {
+  static const char order[] = "cZXCVASDFGQWERT1234509876POIUYeLKJH sMNB";
+  for(int i = 0; order[i]; i++)
+    if(order[i] == (char)c) return i;
+  return -1;
+}
+static int type_start_frame = 100; // prompt is up ~frame 90; boot.tap pilot runs to ~frame 250
+static uint64_t type_bits_at(const char* s, int f) {
+  if(!s) return 0;
+  uint64_t b = 0;
+  for(int i = 0; s[i]; i++) {
+    int t0 = type_start_frame + i * 12;
+    if(f < t0 || f >= t0 + 4) continue;
+    unsigned char c = (unsigned char)s[i];
+    if(c >= 'a' && c <= 'z') c -= 32;
+    if(c == '"') b |= (1ull << (22 + 36)) | (1ull << (22 + 25)); // Symbol Shift(58)+P(47)
+    else if(c == '\n') b |= (1ull << (22 + 30));
+    else { int p = p5pos_type(c); if(p >= 0) b |= (1ull << (22 + p)); }
+  }
+  return b;
+}
+
 int main(int argc, char** argv) {
   const char* file = NULL;
   const char* resdir_override = NULL;
@@ -102,6 +131,8 @@ int main(int argc, char** argv) {
   // uses — parity compares the identical path.
   uint64_t input_mask = 0; unsigned input_keys = 0; // mask is full 64-bit: the P5 keyboard lives past bit 21
   int input_from = -1, input_to = -1;
+  const char *type_str = NULL;
+  static char type_buf[4096];
   bool mode48k = false, fastTape = true;
   const char* soundChip = "ay";
   for(int i = 1; i < argc; i++) {
@@ -115,6 +146,13 @@ int main(int argc, char** argv) {
     else if(!strcmp(argv[i], "--input-keys") && i + 1 < argc) input_keys = (unsigned)strtoul(argv[++i], NULL, 0);
     else if(!strcmp(argv[i], "--input-from") && i + 1 < argc) input_from = atoi(argv[++i]);
     else if(!strcmp(argv[i], "--input-to") && i + 1 < argc) input_to = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--type") && i + 1 < argc) type_str = argv[++i];
+    else if(!strcmp(argv[i], "--type-at") && i + 1 < argc) type_start_frame = atoi(argv[++i]);
+    else if(!strcmp(argv[i], "--type-file") && i + 1 < argc) {
+      FILE* tf = fopen(argv[++i], "rb");
+      if(tf) { size_t tn = fread(type_buf, 1, sizeof type_buf - 1, tf); fclose(tf); type_buf[tn] = 0; type_str = type_buf; }
+    }
+
     else if(!strcmp(argv[i], "--mode48k")) mode48k = true;
     else if(!strcmp(argv[i], "--no-fast-tape")) fastTape = false;
     else if(!strcmp(argv[i], "--sound-chip") && i + 1 < argc) soundChip = argv[++i];
@@ -181,6 +219,7 @@ int main(int argc, char** argv) {
       if(input_keys & 0x01) buttons |= (1ull << 20);
       if(input_keys & 0x02) buttons |= (1ull << 21);
     }
+    buttons |= type_bits_at(type_str, f); // --type schedule runs on its own clock
     m.ApplyMask(buttons);
     m.FrameAdvance();
     ++stepped;

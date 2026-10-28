@@ -39,7 +39,14 @@ static struct eFileTypeTape : public eFileType
     bool ok = FilesMachine()->Device<eTape>()->Open(Type(), data, data_size);
     if(ok)
     {
+      // No UI play button and no tape macro exists headless: an opened tape
+      // auto-plays (upstream's autoplay path starts it as part of loading).
+      // Start AFTER Reset: Reset rewinds and stops the tape, so starting
+      // before it would be immediately undone. A finished tape stays
+      // finished until re-open (like a real deck at end of tape); without
+      // this the tape never moves and LOAD "" hears silence.
       FilesMachine()->Reset();
+      FilesMachine()->Device<eTape>()->Start();
       FilesMachine()->Devices().Get<eRom>()->SelectPage(
           FilesMachine()->Devices().Get<eRom>()->ROM_SOS());
     }

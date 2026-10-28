@@ -51,6 +51,8 @@ void Machine::Reset() {
   // in 48K mode (eRom::Reset leaves the service page mapped). Without this
   // a firmware-only 128K boot strands in the service ROM. Tape/snapshot
   // paths select their own page right after, exactly like upstream.
+  // (Tape autostart lives in FileTypeTape::Open, after its Reset: Reset
+  // rewinds and stops the tape, so starting must come after, not here.)
   if(!speccy->Mode48k())
     speccy->Device<eRom>()->SelectPage(eRom::ROM_128_1);
 }
@@ -108,7 +110,10 @@ void Machine::ApplyLastMask() {
   // Many buttons drive the same upstream key (every preset aliases P5 keys,
   // and Key.Space/Enter alias P5 Space/Enter): the level is the OR over all
   // of them, applied once per distinct key, so the last writer can never
-  // release a key another button still holds.
+  // release a key another button still holds. The Caps/Symbol Shift states
+  // ride every call (upstream OnKey clears both shifts unless told
+  // otherwise, so a hardcoded false here would make the P5 shift keys
+  // unholdable and break quoted strings and shifted capitals outright).
   bool kbd[128] = {}, joy[128] = {};
   for(int i = 0; i < ButtonCount(); i++) {
     if(((lastMask >> i) & 1ull) == 0)
@@ -124,7 +129,7 @@ void Machine::ApplyLastMask() {
       if(doneK[k])
         continue;
       doneK[k] = true;
-      speccy->Device<eKeyboard>()->OnKey(b.key, kbd[k], false, false, false);
+      speccy->Device<eKeyboard>()->OnKey(b.key, kbd[k], kbd['c'], false, kbd['s']);
     } else {
       if(doneJ[k])
         continue;

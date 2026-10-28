@@ -34,6 +34,15 @@ while [ $# -gt 0 ]; do
     if [ "$SRC" != "$GB" ]; then cp "$SRC" "$GB"; fi
     ARGS="$ARGS --game $GB"
     shift || true
+  elif [ "$1" = "--type-file" ]; then
+    shift
+    # Same space-free staging as --game (the typed string rides a file so
+    # quotes and spaces survive the WSL trampoline verbatim).
+    case "$1" in */*) TS="$1";; *) TS="$GUEST_DIR/$1";; esac
+    TB="/home/cloak/$(basename "$TS")"
+    if [ "$TS" != "$TB" ]; then cp "$TS" "$TB"; fi
+    ARGS="$ARGS --type-file $TB"
+    shift || true
   else
     ARGS="$ARGS $1"
     shift || true

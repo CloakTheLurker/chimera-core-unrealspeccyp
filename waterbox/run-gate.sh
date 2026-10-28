@@ -326,6 +326,38 @@ echo "gate leg m6-kbd-alias-space: native=$NS57 guest=$GS"
 [ "$NS57" = "$GS" ] || { echo "gate leg m6-kbd-alias-space: FAILED — keyboard run differs across flavors" >&2; exit 1; }
 echo "gate leg m6-kbd-alias-space: console and P5 aliases agree in both flavors"
 
+echo "gate leg m6-tape-load: typed LOAD \"\" boots the tape (fast loader)"
+RUN_CONTENT="$ROOT/test-content/boot.tap"
+cp "$RUN_CONTENT" "$ROOT/build/guest/"
+GGAME="--game $(basename "$RUN_CONTENT")"
+cp "$ROOT/waterbox/tests/typeload.txt" "$ROOT/build/guest/typeload.txt"
+NTAP=$(state_of --frames 600 --clock virtual)
+NTLOAD=$(state_of --frames 600 --clock virtual --type-file "$ROOT/waterbox/tests/typeload.txt")
+NTLOADV=$(field_of /tmp/gate_last.log run-native vhash)
+echo "gate leg m6-tape-load: plain=$NTAP loaded=$NTLOAD"
+[ "$NTLOAD" != "$NTAP" ] || { echo "gate leg m6-tape-load: FAILED — typing LOAD changed nothing; the leg has no teeth" >&2; exit 1; }
+[ "$NTLOADV" = "1f68c3e9fe52024f" ] || { echo "gate leg m6-tape-load: FAILED — loaded screen is not the known-good Program: boot + 0 OK (got $NTLOADV)" >&2; exit 1; }
+on_guest_host guest-legs.sh 600 $GGAME --type-file typeload.txt
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GT=$(field_of /tmp/gate_wbx.log guest state)
+GTV=$(field_of /tmp/gate_wbx.log guest vhash)
+echo "gate leg m6-tape-load: native=$NTLOAD guest=$GT"
+[ "$NTLOAD" = "$GT" ] || { echo "gate leg m6-tape-load: FAILED — loaded tape differs across flavors" >&2; exit 1; }
+[ "$GTV" = "1f68c3e9fe52024f" ] || { echo "gate leg m6-tape-load: FAILED — guest did not reach the known-good loaded screen" >&2; exit 1; }
+echo "gate leg m6-tape-load: LOAD \"\" types (Symbol Shift works), the tape plays, both flavors land on Program: boot"
+
+echo "gate leg m6-tape-load-exact: same, cycle-exact (trap off)"
+NTLOADE=$(state_of --frames 600 --clock virtual --no-fast-tape --type-file "$ROOT/waterbox/tests/typeload.txt")
+echo "gate leg m6-tape-load-exact: native=$NTLOADE plain=$NTAP"
+[ "$NTLOADE" != "$NTAP" ] || { echo "gate leg m6-tape-load-exact: FAILED — no load without the trap either" >&2; exit 1; }
+printf '{"fastTape": false}' > "$ROOT/build/guest/m-nofast.json"
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m-nofast.json --type-file typeload.txt
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GE=$(field_of /tmp/gate_wbx.log guest state)
+echo "gate leg m6-tape-load-exact: native=$NTLOADE guest=$GE"
+[ "$NTLOADE" = "$GE" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load differs across flavors" >&2; exit 1; }
+echo "gate leg m6-tape-load-exact: cycle-exact loading agrees across flavors"
+
 echo "gate leg m5-frontend: the real frontend boots content headless (boot/determinism/input/rerecord/keybinds)"
 if [ "$(uname -s)" = "Linux" ]; then
   sh "$ROOT/waterbox/tests/run-frontend.sh" 2>&1 | tee "$ROOT/build/guest/fe-gate.log"

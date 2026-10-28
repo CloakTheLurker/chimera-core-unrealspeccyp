@@ -348,3 +348,32 @@ end to end; the snapshot exercises xSnapshot::Load.
   frontend keybinds leg holds all 62 (P5 by whole name, past Lua's float
   range for bit math). default_keybinds: renamed presets + 1:1 keyboard
   (Number0-9, letters, Space, Enter, merged Shift).
+
+## Tape autostart, Symbol Shift, grouped names, typed LOAD (2026-10-28)
+
+- Tapes never moved: nothing ever called eTape::Start (upstream relies on a
+  UI play button + tape macro the headless core has no room for). Worse, the
+  reset inside FileTypeTape::Open stopped the tape that Open had just
+  started. Now Open starts the tape AFTER its Reset (a finished tape stays
+  finished, like a real deck). Seen in mhash the moment it landed.
+- Symbol Shift never worked: Machine::ApplyMask passed hardwired
+  shift=false/alt=false to eKeyboard::OnKey, whose contract clears both
+  shifts on every call — a held P5 Shift was released by the same call that
+  set it. Now the ORed Caps/Symbol levels ride every OnKey call (the real
+  semantic: shifts are modifiers of the same read). Verified by typing
+  PRINT "A" (prints A + 0 OK) and by loading a tape whose name needs quotes.
+- Found together with a test-bit typo (my --type mapped '"' to bit 59/'M'
+  instead of 58/Symbol): the m6 alias legs pin the real mapping by equating
+  P5 Q/Space with the trusted QAOP/Space keys in both flavors.
+- waterbox/tests/typeload.txt types J "" + Enter (J is the LOAD keyword;
+  4f hold/12f period from frame 100, inside the header pilot). Gate leg
+  m6-tape-load (+cycle-exact variant with fastTape off): teeth are a state
+  change vs plain TAP; the fast-load vhash is pinned to the known-good
+  loaded screen (Program: boot ... 0 OK, 10:1, verified visually), guest
+  must match it too.
+- Column groups are named after controller type, not player number:
+  waterbox.config input gained optional "playerNames" (1 Kempston, 2
+  Sinclair, 3 Cursor, 4 QAOP, 5 Keyboard); Chimera renders those in
+  TAStudio's column menu instead of "Player n" (WaterboxConfig.InputConfig,
+  ControllerDefinition, WaterboxCore.MakeControllerDefinition,
+  TAStudio.MenuItems; unknown keys are ignored, so old packages are fine).
