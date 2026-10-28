@@ -26,6 +26,7 @@ local function finish(status, detail)
     "frames=" .. (meta.frames or 0),
     "ram=" .. (meta.ram or ""),
     "vram=" .. (meta.vram or ""),
+    "lag=" .. (meta.lag or ""),
   }
   if meta.metaPath then writeAll(meta.metaPath, table.concat(lines, "\n") .. "\n") end
   client.exit()
@@ -78,5 +79,6 @@ end
 meta.frames = emu.framecount()
 meta.ram = memory.hash_region(0, 131072, "RAM")
 meta.vram = memory.hash_region(0, 76800, "VRAM")
+meta.lag = emu.lagcount()
 client.screenshot(job.shot)
 finish("OK", "")

@@ -377,3 +377,16 @@ end to end; the snapshot exercises xSnapshot::Load.
   TAStudio's column menu instead of "Player n" (WaterboxConfig.InputConfig,
   ControllerDefinition, WaterboxCore.MakeControllerDefinition,
   TAStudio.MenuItems; unknown keys are ignored, so old packages are fine).
+
+## Lag frames + display name (2026-10-28, on top of the above)
+
+- Lag frames, following chimera-core-fuse: patches/002-input-was-read.patch
+  sets a guest flag in eKeyboard/eKempstonJoy IoRead (native builds compile
+  it out via WBX_GUEST); wbx-entry clears it per FrameAdvance and exports
+  InputWasRead; waterbox.config declares lag.inputWasRead. The frontend
+  REQUIRES the export when declared (aborts without it), so a missing hook
+  fails boot, loudly. Frontend leg fe-lag asserts 0 < lagcount < frames on
+  the TAP boot (measured 80/600: boot ROM init doesn't poll, then every
+  frame does) — teeth in both directions.
+- systemNames {"ZXS": "ZX Spectrum"} (same pattern as fuse): the display
+  name for the system; the id stays ZXS (movie/project compat).

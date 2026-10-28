@@ -1,0 +1,32 @@
+--- a/devices/input/keyboard.cpp
++++ b/devices/input/keyboard.cpp
+@@ -45,6 +45,14 @@
+ //-----------------------------------------------------------------------------
+ void eKeyboard::IoRead(word port, byte* v, int tact)
+ {
++	// waterbox hook (BUILD OPTION, guest only): the adapter counts a frame
++	// in which the program looked at the keys, for the frontend lag
++	// counter. Native builds are untouched.
++#ifdef WBX_GUEST
++	// (declared with a plain extern: the adapter TU defines it)
++	extern int g_wbx_inputWasRead;
++	g_wbx_inputWasRead = 1;
++#endif
+ 	*v = Read(port >> 8);
+ }
+ //=============================================================================
+--- a/devices/input/kempston_joy.cpp
++++ b/devices/input/kempston_joy.cpp
+@@ -40,6 +40,12 @@
+ //-----------------------------------------------------------------------------
+ void eKempstonJoy::IoRead(word port, byte* v, int tact)
+ {
++	// waterbox hook (BUILD OPTION, guest only): same lag counter as the
++	// keyboard hook above; a frame that reads either is not lag.
++#ifdef WBX_GUEST
++	extern int g_wbx_inputWasRead;
++	g_wbx_inputWasRead = 1;
++#endif
+ 	*v = state;
+ }
+ 

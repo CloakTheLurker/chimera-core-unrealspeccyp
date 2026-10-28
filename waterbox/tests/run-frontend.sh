@@ -138,6 +138,13 @@ fe_run boot "$FRAMES" 0 "" 0
 [ -n "$(fe_meta boot ram)" ] || { echo "fe leg fe-boot: FAILED — no RAM hash (memory domains not published)" >&2; exit 1; }
 echo "fe leg fe-boot: system ZXS, $FRAMES frames, ram=$(fe_meta boot ram | cut -c1-16)..."
 
+echo "fe leg fe-lag: the boot reads input most frames but not all (lag counter works both ways)"
+LBL=$(fe_meta boot lag)
+case "$LBL" in ''|*[!0-9]*) echo "fe leg fe-lag: FAILED — no numeric lag count (got '$LBL')" >&2; exit 1;; esac
+[ "$LBL" -gt 0 ] || { echo "fe leg fe-lag: FAILED — lag is 0: the hook never saw an unread frame (or never runs)" >&2; exit 1; }
+[ "$LBL" -lt "$FRAMES" ] || { echo "fe leg fe-lag: FAILED — every frame lagged: the hook never fires" >&2; exit 1; }
+echo "fe leg fe-lag: lag=$LBL of $FRAMES (boot pause, then polled every frame)"
+
 echo "fe leg fe-determinism: the same boot twice gives identical machine hashes"
 fe_run repeat "$FRAMES" 0 "" 0
 [ "$(fe_meta repeat status)" = "OK" ] || { echo "fe leg fe-determinism: FAILED — repeat run not OK" >&2; exit 1; }

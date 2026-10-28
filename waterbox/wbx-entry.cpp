@@ -26,6 +26,12 @@ static uint32_t g_bgra[320 * 240]; // == VideoWidth * VideoHeight (a static call
 static int16_t g_audio[2048]; // > one frame (882 pairs) with headroom
 static uint32_t g_audioCount = 0; // stereo pairs in g_audio after the frame
 
+// Lag frames: set when the emulated program reads the keyboard or Kempston
+// joystick during a frame (patched IoRead hooks in devices/input); cleared
+// at the start of every frame. The engine counts a frame with no reads as
+// lag. Native builds never compile this file, so no flavor split is needed.
+int g_wbx_inputWasRead = 0;
+
 ECL_EXPORT bool Init(void) {
   g_machine = new Machine();
   int mode48k = wbx_setting_bool("mode48k", 0);
@@ -67,6 +73,7 @@ ECL_EXPORT bool Init(void) {
 
 // The engine's packed button mask, whole level every frame.
 ECL_EXPORT void FrameAdvance(uint64_t buttons) {
+  g_wbx_inputWasRead = 0;
   g_machine->ApplyMask(buttons);
   g_machine->FrameAdvance();
   // The engine reads audio as a pointer (GetAudio, no arguments) after the
@@ -135,6 +142,12 @@ ECL_EXPORT const int16_t* GetAudio(void) {
 // into frame 0, and truncating that would break parity, not keep it).
 ECL_EXPORT int32_t GetAudioSampleCount(void) {
   return (int32_t)g_audioCount;
+}
+
+// Whether the emulated program read the keyboard or Kempston joystick
+// during the frame just stepped (the engine's lag counter reads this).
+ECL_EXPORT int32_t InputWasRead(void) {
+  return g_wbx_inputWasRead;
 }
 
 // The last mix, for drivers that read rather than pass a buffer.

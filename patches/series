@@ -4,3 +4,4 @@
 # a dirty tree is taken to already have it; never detect one by one.
 # Every patch is a build option or a hook, never a deletion.
 001-guest-firmware-names.patch
+002-input-was-read.patch

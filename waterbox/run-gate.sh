@@ -358,7 +358,7 @@ echo "gate leg m6-tape-load-exact: native=$NTLOADE guest=$GE"
 [ "$NTLOADE" = "$GE" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load differs across flavors" >&2; exit 1; }
 echo "gate leg m6-tape-load-exact: cycle-exact loading agrees across flavors"
 
-echo "gate leg m5-frontend: the real frontend boots content headless (boot/determinism/input/rerecord/keybinds)"
+echo "gate leg m5-frontend: the real frontend boots content headless (boot/lag/determinism/input/rerecord/keybinds)"
 if [ "$(uname -s)" = "Linux" ]; then
   sh "$ROOT/waterbox/tests/run-frontend.sh" 2>&1 | tee "$ROOT/build/guest/fe-gate.log"
   grep -q "fe: done" "$ROOT/build/guest/fe-gate.log" || { echo "gate leg m5-frontend: FAILED — frontend suite did not finish green" >&2; exit 1; }
