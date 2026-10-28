@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
       if(tf) { size_t tn = fread(type_buf, 1, sizeof type_buf - 1, tf); fclose(tf); type_buf[tn] = 0; type_str = type_buf; }
     }
 
-    else if(!strcmp(argv[i], "--mode48k")) mode48k = true;
+    else if(!strcmp(argv[i], "--machine") && i + 1 < argc) { const char* m = argv[++i]; mode48k = (m[0] == '4' && m[1] == '8'); }
     else if(!strcmp(argv[i], "--no-fast-tape")) fastTape = false;
     else if(!strcmp(argv[i], "--sound-chip") && i + 1 < argc) soundChip = argv[++i];
     else if(!strcmp(argv[i], "--dump-video")) {} // kept: video is always hashed (M1)

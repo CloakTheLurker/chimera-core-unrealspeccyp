@@ -390,3 +390,25 @@ end to end; the snapshot exercises xSnapshot::Load.
   frame does) — teeth in both directions.
 - systemNames {"ZXS": "ZX Spectrum"} (same pattern as fuse): the display
   name for the system; the id stays ZXS (movie/project compat).
+
+## Two machines instead of a 48K-mode bool (2026-10-28)
+
+- The mode48k bool is gone. The package declares two machines picked by a
+  "machine" enum setting (128k default = status quo): ZXS "ZX Spectrum
+  128K" and ZXS48 "ZX Spectrum 48K", chosen at project creation and
+  recorded in movies like any structural setting. A snapshot still brings
+  its own machine (SetupDevices overrides Configure, as in fuse).
+- Guest Init reads wbx_setting_str("machine"); native --machine 48k|128k
+  does the same mapping. run-wbx needs nothing: the setting rides the
+  standard mounted settings JSON.
+- m4-boot-pages now covers both machines' firmware boots (same goldens);
+  m4-settings-parity is machine=48k parity with teeth (differs from 128K);
+  m6-tape-load-48k proves 48K BASIC loads the tape (own golden, visually
+  verified). m5-content-settings was dropped (a 48K snapshot forces 48K
+  devices either way, and silent BASIC gives the AY nothing to shape, so
+  no teeth are honest there); the settings channel on content is covered
+  by m6-tape-load-exact (fastTape=false JSON).
+- soundChip has no CI teeth: every testable state is silent, so AY vs YM
+  is unobservable (verified identical on the Manic Miner snapshot, which
+  has no AY music in range). It travels the same proven JSON channel;
+  kept in the package and the matrix, out of the gate.

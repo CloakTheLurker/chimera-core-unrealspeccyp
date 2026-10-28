@@ -4,10 +4,10 @@
 # The ROMs/ folder holds copyrighted files (untracked, gitignored); no CI
 # runner has them, so this lives beside the gate instead of in it.
 # Usage: run-rom-matrix.sh [--frames N] <game>...
-# For each game file × all 8 sync-setting combos (mode48k × fastTape ×
+# For each game file × all 8 sync-setting combos (machine × fastTape ×
 # soundChip), native vs guest must agree on state+tstates+vhash+bhash+mhash
 # — the settings channel is exercised end to end on real content.
-# For tape content the mode48k combo must additionally MOVE the machine
+# For tape content the 48K-machine combo must additionally MOVE the machine
 # (ROM switch), or the matrix has no teeth.
 set -eu
 HERE=$(dirname "$0")
@@ -57,25 +57,25 @@ field_of() { sed -n "s/^$2 .* $3=\([^ ]*\) .*$/\1/p" "$1" | head -n 1; }
 # explicitly so every combo flows through the JSON channel).
 mkdir -p "$GUEST_DIR"
 printf '{}' > "$GUEST_DIR/m-c0.json"
-printf '{"mode48k": true}' > "$GUEST_DIR/m-c1.json"
+printf '{"machine": "48k"}' > "$GUEST_DIR/m-c1.json"
 printf '{"fastTape": false}' > "$GUEST_DIR/m-c2.json"
 printf '{"soundChip": "ym"}' > "$GUEST_DIR/m-c3.json"
-printf '{"mode48k": true, "fastTape": false}' > "$GUEST_DIR/m-c4.json"
-printf '{"mode48k": true, "soundChip": "ym"}' > "$GUEST_DIR/m-c5.json"
+printf '{"machine": "48k", "fastTape": false}' > "$GUEST_DIR/m-c4.json"
+printf '{"machine": "48k", "soundChip": "ym"}' > "$GUEST_DIR/m-c5.json"
 printf '{"fastTape": false, "soundChip": "ym"}' > "$GUEST_DIR/m-c6.json"
-printf '{"mode48k": true, "fastTape": false, "soundChip": "ym"}' > "$GUEST_DIR/m-c7.json"
+printf '{"machine": "48k", "fastTape": false, "soundChip": "ym"}' > "$GUEST_DIR/m-c7.json"
 
 # $1 = combo id (c0..c7); prints native flags for run-native.
 native_flags() {
   case "$1" in
     c0) ;;
-    c1) printf '%s' '--mode48k';;
+    c1) printf '%s' '--machine 48k';;
     c2) printf '%s' '--no-fast-tape';;
     c3) printf '%s' '--sound-chip ym';;
-    c4) printf '%s' '--mode48k --no-fast-tape';;
-    c5) printf '%s' '--mode48k --sound-chip ym';;
+    c4) printf '%s' '--machine 48k --no-fast-tape';;
+    c5) printf '%s' '--machine 48k --sound-chip ym';;
     c6) printf '%s' '--no-fast-tape --sound-chip ym';;
-    c7) printf '%s' '--mode48k --no-fast-tape --sound-chip ym';;
+    c7) printf '%s' '--machine 48k --no-fast-tape --sound-chip ym';;
   esac
 }
 
@@ -118,9 +118,9 @@ for game in "$@"; do
   done
   case "$ext" in
     [Tt][Aa][Pp]|[Tt][Zz][Xx]|[Cc][Ss][Ww])
-      # Tape boots through the ROM: the mode48k ROM switch must move it.
-      [ "$c1state" != "$c0state" ] || { echo "matrix: FAILED ($base) — mode48k changed nothing on tape content; the matrix has no teeth" >&2; exit 1; }
-      echo "matrix: teeth confirmed (mode48k moves $base: $c0state -> $c1state)";;
+      # Tape boots through the ROM: the 48k machine switch must move it.
+      [ "$c1state" != "$c0state" ] || { echo "matrix: FAILED ($base) — 48K machine changed nothing on tape content; the matrix has no teeth" >&2; exit 1; }
+      echo "matrix: teeth confirmed (48k machine moves $base: $c0state -> $c1state)";;
     *) echo "matrix: note: $base is a snapshot (devices come from the image); parity across all 8 combos is the assertion";;
   esac
 done

@@ -219,28 +219,25 @@ echo "gate leg m3-session: continued tstates=$CT lvhash=$CLV lmhash=$CLM"
 echo "gate leg m3-session: a savestate taken mid-run resumes the same machine"
 echo "gate leg m3-session: save file lives at /home/cloak/m3-session.state (native ext4: survives wsl -t, unlike /tmp)"
 
-echo "gate leg m4-settings-teeth: mode48k must perturb the firmware boot (native)"
-SN48=$(state_of --frames 600 --clock virtual --mode48k)
-echo "gate leg m4-settings-teeth: default=$S0 mode48k=$SN48"
-[ "$SN48" != "$S0" ] || { echo "gate leg m4-settings-teeth: FAILED — mode48k changed nothing; the leg has no teeth" >&2; exit 1; }
-
-echo "gate leg m4-settings-parity: guest with mode48k+ym agrees with native"
-printf '{"mode48k": true, "soundChip": "ym"}' > "$ROOT/build/guest/m48ym.json"
-SN48YM=$(state_of --frames 600 --clock virtual --mode48k --sound-chip ym)
+echo "gate leg m4-settings-parity: guest with machine=48k agrees with native"
+printf '{"machine": "48k"}' > "$ROOT/build/guest/m48.json"
+SN48M=$(state_of --frames 600 --clock virtual --machine 48k)
+echo "gate leg m4-settings-parity: default=$S0 48k=$SN48M"
+[ "$SN48M" != "$S0" ] || { echo "gate leg m4-settings-parity: FAILED — machine=48k changed nothing; the leg has no teeth" >&2; exit 1; }
 echo "gate leg m4-settings-parity: native: $(summary_of)"
-on_guest_host guest-legs.sh 600 $GGAME --settings-json m48ym.json
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m48.json
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 SG48=$(field_of /tmp/gate_wbx.log guest state)
-echo "gate leg m4-settings-parity: native=$SN48YM guest=$SG48"
-[ "$SN48YM" = "$SG48" ] || { echo "gate leg m4-settings-parity: FAILED — settings run differs across flavors" >&2; exit 1; }
-echo "gate leg m4-settings-parity: the settings channel reaches the machine identically in both flavors"
+echo "gate leg m4-settings-parity: native=$SN48M guest=$SG48"
+[ "$SN48M" = "$SG48" ] || { echo "gate leg m4-settings-parity: FAILED — machine run differs across flavors" >&2; exit 1; }
+echo "gate leg m4-settings-parity: the machine setting reaches the guest identically in both flavors"
 
 echo "gate leg m4-boot-pages: firmware boots to the right ROM page"
 SAVED_RUN_CONTENT="$RUN_CONTENT"
 RUN_CONTENT=""
 FW128=$(state_of --frames 600 --clock virtual)
 FW128V=$(field_of /tmp/gate_last.log run-native vhash)
-FW48=$(state_of --frames 600 --clock virtual --mode48k)
+FW48=$(state_of --frames 600 --clock virtual --machine 48k)
 FW48V=$(field_of /tmp/gate_last.log run-native vhash)
 RUN_CONTENT="$SAVED_RUN_CONTENT"
 echo "gate leg m4-boot-pages: 128K vhash=$FW128V 48K vhash=$FW48V"
@@ -289,17 +286,10 @@ sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GK=$(field_of /tmp/gate_wbx.log guest state)
 echo "gate leg m5-content-input-parity: native=$NSNAK guest=$GK"
 [ "$NSNAK" = "$GK" ] || { echo "gate leg m5-content-input-parity: FAILED — content input run differs across flavors" >&2; exit 1; }
-
-echo "gate leg m5-content-settings-parity: guest with mode48k+ym on SNA agrees with native"
-NSNA48YM=$(state_of --frames 600 --clock virtual --mode48k --sound-chip ym)
-echo "gate leg m5-content-settings-parity: native: $(summary_of)"
-on_guest_host guest-legs.sh 600 $GGAME --settings-json m48ym.json
-sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
-GS48=$(field_of /tmp/gate_wbx.log guest state)
-echo "gate leg m5-content-settings-parity: native=$NSNA48YM guest=$GS48"
-[ "$NSNA48YM" = "$GS48" ] || { echo "gate leg m5-content-settings-parity: FAILED — settings+content run differs across flavors" >&2; exit 1; }
-[ "$NSNA48YM" != "$NSNA" ] || { echo "gate leg m5-content-settings-parity: FAILED — settings changed nothing on content; the leg has no teeth" >&2; exit 1; }
-echo "gate leg m5-content-settings-parity: settings reach the content-booted machine identically in both flavors"
+# (No m5 settings leg: a snapshot carries its own machine (48K here), so the
+# machine setting cannot perturb it, and the silent BASIC has no AY audio for
+# the chip to shape. The settings channel is gated by m4 (machine on
+# firmware) and m6-tape-load-exact (fastTape on content), both with teeth.)
 echo "gate leg m6-kbd-alias-q: P5 Q (bit32) must drive the same key as QAOP Q (bit15)"
 RUN_CONTENT="$ROOT/test-content/boot48.sna"
 NQ15=$(state_of --frames 600 --clock virtual --input-mask 0x8000 --input-from 0 --input-to 600)
@@ -348,15 +338,36 @@ echo "gate leg m6-tape-load: LOAD \"\" types (Symbol Shift works), the tape play
 
 echo "gate leg m6-tape-load-exact: same, cycle-exact (trap off)"
 NTLOADE=$(state_of --frames 600 --clock virtual --no-fast-tape --type-file "$ROOT/waterbox/tests/typeload.txt")
+NTLOADEV=$(field_of /tmp/gate_last.log run-native vhash)
 echo "gate leg m6-tape-load-exact: native=$NTLOADE plain=$NTAP"
 [ "$NTLOADE" != "$NTAP" ] || { echo "gate leg m6-tape-load-exact: FAILED — no load without the trap either" >&2; exit 1; }
+[ "$NTLOADEV" = "4a0be3c81e1afd57" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load did not reach Program: boot + 0 OK (got $NTLOADEV)" >&2; exit 1; }
 printf '{"fastTape": false}' > "$ROOT/build/guest/m-nofast.json"
 on_guest_host guest-legs.sh 600 $GGAME --settings-json m-nofast.json --type-file typeload.txt
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GE=$(field_of /tmp/gate_wbx.log guest state)
+GEV=$(field_of /tmp/gate_wbx.log guest vhash)
 echo "gate leg m6-tape-load-exact: native=$NTLOADE guest=$GE"
 [ "$NTLOADE" = "$GE" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load differs across flavors" >&2; exit 1; }
+[ "$GEV" = "4a0be3c81e1afd57" ] || { echo "gate leg m6-tape-load-exact: FAILED — guest exact load missed Program: boot" >&2; exit 1; }
 echo "gate leg m6-tape-load-exact: cycle-exact loading agrees across flavors"
+
+echo "gate leg m6-tape-load-48k: same tape on the 48K machine"
+printf '{"machine": "48k"}' > "$ROOT/build/guest/m-48k.json"
+NTLOAD48=$(state_of --frames 600 --clock virtual --machine 48k --type-file "$ROOT/waterbox/tests/typeload.txt")
+NTLOAD48V=$(field_of /tmp/gate_last.log run-native vhash)
+NTPLAIN48=$(state_of --frames 600 --clock virtual --machine 48k)
+echo "gate leg m6-tape-load-48k: plain=$NTPLAIN48 loaded=$NTLOAD48"
+[ "$NTLOAD48" != "$NTPLAIN48" ] || { echo "gate leg m6-tape-load-48k: FAILED — typing LOAD changed nothing on 48K" >&2; exit 1; }
+[ "$NTLOAD48V" = "390d2650514cd49f" ] || { echo "gate leg m6-tape-load-48k: FAILED — 48K load is not the known-good Program: boot + 0 OK (got $NTLOAD48V)" >&2; exit 1; }
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m-48k.json --type-file typeload.txt
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+G48=$(field_of /tmp/gate_wbx.log guest state)
+G48V=$(field_of /tmp/gate_wbx.log guest vhash)
+echo "gate leg m6-tape-load-48k: native=$NTLOAD48 guest=$G48"
+[ "$NTLOAD48" = "$G48" ] || { echo "gate leg m6-tape-load-48k: FAILED — 48K load differs across flavors" >&2; exit 1; }
+[ "$G48V" = "390d2650514cd49f" ] || { echo "gate leg m6-tape-load-48k: FAILED — guest 48K load missed Program: boot" >&2; exit 1; }
+echo "gate leg m6-tape-load-48k: 48K BASIC loads the tape identically in both flavors"
 
 echo "gate leg m5-frontend: the real frontend boots content headless (boot/lag/determinism/input/rerecord/keybinds)"
 if [ "$(uname -s)" = "Linux" ]; then

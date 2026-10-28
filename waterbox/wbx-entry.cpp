@@ -34,7 +34,10 @@ int g_wbx_inputWasRead = 0;
 
 ECL_EXPORT bool Init(void) {
   g_machine = new Machine();
-  int mode48k = wbx_setting_bool("mode48k", 0);
+  char machine[16] = {0};
+  int mode48k = 0; // default machine is the 128K Pentagon (status quo)
+  if(wbx_setting_str("machine", machine, sizeof machine) && machine[0] == '4' && machine[1] == '8')
+    mode48k = 1;
   int fastTape = wbx_setting_bool("fastTape", 1);
   char chip[16] = {0};
   int soundChip = 0; // 0 = ay, 1 = ym
