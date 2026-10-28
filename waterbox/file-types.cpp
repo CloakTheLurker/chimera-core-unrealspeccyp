@@ -46,9 +46,20 @@ static struct eFileTypeTape : public eFileType
       // finished until re-open (like a real deck at end of tape); without
       // this the tape never moves and LOAD "" hears silence.
       FilesMachine()->Reset();
+      // eSpeccy::Reset is the raw device reset: it leaves the service ROM
+      // mapped (eRom::Reset). Machine::Reset normally follows it with the
+      // 128K menu page, but this file-type layer holds an eSpeccy, so do the
+      // same thing here. The 48K machine needs nothing: eRom::Reset already
+      // picked sos48 there.
+      //
+      // Do NOT select ROM_SOS(): in 128K mode that is the 128K's 48 BASIC
+      // ROM, so opening a tape replaced the menu the moment a tape arrived -
+      // the machine stayed a 128K, but it looked like a 48K and the menu's
+      // Tape Loader was gone. A real 128K starts at its menu and switches to
+      // 48 BASIC only when the user picks Tape Loader.
+      if(!FilesMachine()->Mode48k())
+        FilesMachine()->Devices().Get<eRom>()->SelectPage(eRom::ROM_128_1);
       FilesMachine()->Device<eTape>()->Start();
-      FilesMachine()->Devices().Get<eRom>()->SelectPage(
-          FilesMachine()->Devices().Get<eRom>()->ROM_SOS());
     }
     return ok;
   }

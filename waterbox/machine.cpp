@@ -41,8 +41,14 @@ Machine::~Machine() { delete speccy; }
 void Machine::Configure(bool mode48k, bool fastTape, int soundChip) {
   speccy->Mode48k(mode48k);
   fast_tape = fastTape;
-  speccy->Device<eAY>()->SetChip(
-      soundChip == 1 ? eAY::CHIP_YM : eAY::CHIP_AY);
+  // Both halves of what upstream's SetupSoundChip does: SetChip alone only
+  // changes how register numbers are masked, so AY and YM produced identical
+  // audio for any legal program. The volume table is the audible difference.
+  eAY* ay = speccy->Device<eAY>();
+  ay->SetChip(soundChip == 1 ? eAY::CHIP_YM : eAY::CHIP_AY);
+  ay->SetVolumes(0x7FFF,
+                 soundChip == 1 ? SNDR_VOL_YM : SNDR_VOL_AY,
+                 SNDR_PAN_ABC);
 }
 
 void Machine::Reset() {

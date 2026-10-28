@@ -405,10 +405,32 @@ end to end; the snapshot exercises xSnapshot::Load.
   m4-settings-parity is machine=48k parity with teeth (differs from 128K);
   m6-tape-load-48k proves 48K BASIC loads the tape (own golden, visually
   verified). m5-content-settings was dropped (a 48K snapshot forces 48K
-  devices either way, and silent BASIC gives the AY nothing to shape, so
-  no teeth are honest there); the settings channel on content is covered
-  by m6-tape-load-exact (fastTape=false JSON).
-- soundChip has no CI teeth: every testable state is silent, so AY vs YM
-  is unobservable (verified identical on the Manic Miner snapshot, which
-  has no AY music in range). It travels the same proven JSON channel;
-  kept in the package and the matrix, out of the gate.
+  devices either way, so the machine setting cannot perturb it); the
+  settings channel on content is covered by m6-tape-load-exact
+  (fastTape=false JSON) and m6-ay-sound (soundChip, below).
+
+## The 128K tape ROM + AY sound (2026-10-28)
+
+- Opening a tape no longer replaces the 128K menu with the 48 BASIC ROM.
+  The file-type layer holds an eSpeccy, so its Reset is the raw device
+  reset (eRom::Reset leaves the service ROM mapped); upstream's autoplay
+  then selected ROM_SOS(), which in 128K mode IS the 128K's 48 BASIC ROM.
+  The machine stayed a 128K (AY, paging) but looked like a 48K and lost
+  the menu. It now selects ROM_128_1 after that reset (what Machine::Reset
+  does), so a 128K project shows the 128K menu with the tape playing and
+  loads through Tape Loader, as a real 128K does. 48K is untouched
+  (eRom::Reset already picked sos48). m6-tape-menu-128k pins the menu
+  screen (the old code gave e6c0..., seen failing) and the guest must
+  match; m6-tape-load/-exact now type Enter on Tape Loader, with new
+  goldens (5de8.../4e60...); m6-tape-load-48k keeps the J "" goldens.
+- soundChip actually changes the sound now: Configure called SetChip only,
+  but SetChip only masks register numbers; the audible difference is the
+  volume table, which upstream's SetupSoundChip also sets. Configure now
+  calls SetVolumes with SNDR_VOL_AY/SNDR_VOL_YM (same ABC panning as
+  before, so AY output is unchanged).
+- AY is gated by distributable content: test-content/ay.sna (built by
+  tests/make-ay-sna.py; zeros + a 62-byte routine, no copyrighted bytes).
+  It turns the border red (proves it ran), sets AY tone A at ~430 Hz and
+  loops. m6-ay-sound asserts the known-good screen, that ay and ym mixed
+  audio differ (teeth: a silent AY would make them identical), and native
+  == guest for both. Volume is 14, not 15: both volume tables agree at 15.

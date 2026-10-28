@@ -17,8 +17,10 @@
 #                     mhash and state all equal — the sandbox did not change
 #                     the answer. Guest legs run on Linux (natively on CI,
 #                     inside WSL Ubuntu from a Windows checkout).
-# Name the test content: exact file first (USP_TEST_CONTENT or test-content/
-# glob), firmware boot (in-tree res/rom) when none. The content in use is
+# Name the test content: USP_TEST_CONTENT, else boot.tap (the default
+# distributable content the m3 legs rely on: it reaches a prompt and reacts
+# to input), else the first test-content file, firmware boot when none. Other
+# legs (AY, snapshots) name their own file explicitly. The content in use is
 # always printed.
 #  m3-input-teeth ... Space+Enter held 600f MUST perturb the firmware run
 #                     (input reaches the machine). If it does not, this leg
@@ -36,6 +38,9 @@ ROOT=$(cd "$HERE/.." && pwd -P)
 NATIVE="$ROOT/build/native/run-native"
 GUEST_WBX="$ROOT/build/guest/core.wbx"
 CONTENT=${USP_TEST_CONTENT:-}
+if [ -z "$CONTENT" ] && [ -f "$ROOT/test-content/boot.tap" ]; then
+  CONTENT="$ROOT/test-content/boot.tap"
+fi
 if [ -z "$CONTENT" ]; then
   CONTENT=$(ls "$ROOT"/test-content/* 2>/dev/null | head -n 1 || true)
 fi
@@ -287,9 +292,10 @@ GK=$(field_of /tmp/gate_wbx.log guest state)
 echo "gate leg m5-content-input-parity: native=$NSNAK guest=$GK"
 [ "$NSNAK" = "$GK" ] || { echo "gate leg m5-content-input-parity: FAILED — content input run differs across flavors" >&2; exit 1; }
 # (No m5 settings leg: a snapshot carries its own machine (48K here), so the
-# machine setting cannot perturb it, and the silent BASIC has no AY audio for
+# machine setting cannot perturb it, and its silent BASIC has no AY audio for
 # the chip to shape. The settings channel is gated by m4 (machine on
-# firmware) and m6-tape-load-exact (fastTape on content), both with teeth.)
+# firmware), m6-tape-load-exact (fastTape on content) and m6-ay-sound
+# (soundChip on a program that programs the AY), all with teeth.)
 echo "gate leg m6-kbd-alias-q: P5 Q (bit32) must drive the same key as QAOP Q (bit15)"
 RUN_CONTENT="$ROOT/test-content/boot48.sna"
 NQ15=$(state_of --frames 600 --clock virtual --input-mask 0x8000 --input-from 0 --input-to 600)
@@ -316,40 +322,54 @@ echo "gate leg m6-kbd-alias-space: native=$NS57 guest=$GS"
 [ "$NS57" = "$GS" ] || { echo "gate leg m6-kbd-alias-space: FAILED — keyboard run differs across flavors" >&2; exit 1; }
 echo "gate leg m6-kbd-alias-space: console and P5 aliases agree in both flavors"
 
-echo "gate leg m6-tape-load: typed LOAD \"\" boots the tape (fast loader)"
+echo "gate leg m6-tape-menu-128k: opening a tape keeps the 128K menu (not the 48K ROM)"
 RUN_CONTENT="$ROOT/test-content/boot.tap"
 cp "$RUN_CONTENT" "$ROOT/build/guest/"
 GGAME="--game $(basename "$RUN_CONTENT")"
 cp "$ROOT/waterbox/tests/typeload.txt" "$ROOT/build/guest/typeload.txt"
+cp "$ROOT/waterbox/tests/typetapeloader.txt" "$ROOT/build/guest/typetapeloader.txt"
 NTAP=$(state_of --frames 600 --clock virtual)
-NTLOAD=$(state_of --frames 600 --clock virtual --type-file "$ROOT/waterbox/tests/typeload.txt")
+NTAPV=$(field_of /tmp/gate_last.log run-native vhash)
+echo "gate leg m6-tape-menu-128k: plain=$NTAP screen=$NTAPV"
+[ "$NTAPV" = "6626bf8fa8d724dd" ] || { echo "gate leg m6-tape-menu-128k: FAILED — a tape on the 128K is not the 128K menu (got $NTAPV); opening it switched ROM" >&2; exit 1; }
+on_guest_host guest-legs.sh 600 $GGAME
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GTAP=$(field_of /tmp/gate_wbx.log guest state)
+GTAPV=$(field_of /tmp/gate_wbx.log guest vhash)
+echo "gate leg m6-tape-menu-128k: native=$NTAP guest=$GTAP"
+[ "$NTAP" = "$GTAP" ] || { echo "gate leg m6-tape-menu-128k: FAILED — the 128K tape boot differs across flavors" >&2; exit 1; }
+[ "$GTAPV" = "6626bf8fa8d724dd" ] || { echo "gate leg m6-tape-menu-128k: FAILED — guest 128K tape boot is not the 128K menu (got $GTAPV)" >&2; exit 1; }
+echo "gate leg m6-tape-menu-128k: the 128K menu stays up with a tape playing, in both flavors"
+
+echo "gate leg m6-tape-load: the menu's Tape Loader loads it (fast loader)"
+NTLOAD=$(state_of --frames 600 --clock virtual --type-file "$ROOT/waterbox/tests/typetapeloader.txt")
 NTLOADV=$(field_of /tmp/gate_last.log run-native vhash)
 echo "gate leg m6-tape-load: plain=$NTAP loaded=$NTLOAD"
-[ "$NTLOAD" != "$NTAP" ] || { echo "gate leg m6-tape-load: FAILED — typing LOAD changed nothing; the leg has no teeth" >&2; exit 1; }
-[ "$NTLOADV" = "1f68c3e9fe52024f" ] || { echo "gate leg m6-tape-load: FAILED — loaded screen is not the known-good Program: boot + 0 OK (got $NTLOADV)" >&2; exit 1; }
-on_guest_host guest-legs.sh 600 $GGAME --type-file typeload.txt
+[ "$NTLOAD" != "$NTAP" ] || { echo "gate leg m6-tape-load: FAILED — Tape Loader changed nothing; the leg has no teeth" >&2; exit 1; }
+[ "$NTLOADV" = "5de8247247554787" ] || { echo "gate leg m6-tape-load: FAILED — Tape Loader did not reach Program: boot + 0 OK (got $NTLOADV)" >&2; exit 1; }
+on_guest_host guest-legs.sh 600 $GGAME --type-file typetapeloader.txt
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GT=$(field_of /tmp/gate_wbx.log guest state)
 GTV=$(field_of /tmp/gate_wbx.log guest vhash)
 echo "gate leg m6-tape-load: native=$NTLOAD guest=$GT"
 [ "$NTLOAD" = "$GT" ] || { echo "gate leg m6-tape-load: FAILED — loaded tape differs across flavors" >&2; exit 1; }
-[ "$GTV" = "1f68c3e9fe52024f" ] || { echo "gate leg m6-tape-load: FAILED — guest did not reach the known-good loaded screen" >&2; exit 1; }
-echo "gate leg m6-tape-load: LOAD \"\" types (Symbol Shift works), the tape plays, both flavors land on Program: boot"
+[ "$GTV" = "5de8247247554787" ] || { echo "gate leg m6-tape-load: FAILED — guest did not reach the known-good loaded screen" >&2; exit 1; }
+echo "gate leg m6-tape-load: Enter on Tape Loader loads the tape, both flavors on Program: boot"
 
 echo "gate leg m6-tape-load-exact: same, cycle-exact (trap off)"
-NTLOADE=$(state_of --frames 600 --clock virtual --no-fast-tape --type-file "$ROOT/waterbox/tests/typeload.txt")
+NTLOADE=$(state_of --frames 600 --clock virtual --no-fast-tape --type-file "$ROOT/waterbox/tests/typetapeloader.txt")
 NTLOADEV=$(field_of /tmp/gate_last.log run-native vhash)
 echo "gate leg m6-tape-load-exact: native=$NTLOADE plain=$NTAP"
 [ "$NTLOADE" != "$NTAP" ] || { echo "gate leg m6-tape-load-exact: FAILED — no load without the trap either" >&2; exit 1; }
-[ "$NTLOADEV" = "4a0be3c81e1afd57" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load did not reach Program: boot + 0 OK (got $NTLOADEV)" >&2; exit 1; }
+[ "$NTLOADEV" = "4e60f88199031fcd" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load did not reach Program: boot + 0 OK (got $NTLOADEV)" >&2; exit 1; }
 printf '{"fastTape": false}' > "$ROOT/build/guest/m-nofast.json"
-on_guest_host guest-legs.sh 600 $GGAME --settings-json m-nofast.json --type-file typeload.txt
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m-nofast.json --type-file typetapeloader.txt
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GE=$(field_of /tmp/gate_wbx.log guest state)
 GEV=$(field_of /tmp/gate_wbx.log guest vhash)
 echo "gate leg m6-tape-load-exact: native=$NTLOADE guest=$GE"
 [ "$NTLOADE" = "$GE" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load differs across flavors" >&2; exit 1; }
-[ "$GEV" = "4a0be3c81e1afd57" ] || { echo "gate leg m6-tape-load-exact: FAILED — guest exact load missed Program: boot" >&2; exit 1; }
+[ "$GEV" = "4e60f88199031fcd" ] || { echo "gate leg m6-tape-load-exact: FAILED — guest exact load missed Program: boot" >&2; exit 1; }
 echo "gate leg m6-tape-load-exact: cycle-exact loading agrees across flavors"
 
 echo "gate leg m6-tape-load-48k: same tape on the 48K machine"
@@ -368,6 +388,44 @@ echo "gate leg m6-tape-load-48k: native=$NTLOAD48 guest=$G48"
 [ "$NTLOAD48" = "$G48" ] || { echo "gate leg m6-tape-load-48k: FAILED — 48K load differs across flavors" >&2; exit 1; }
 [ "$G48V" = "390d2650514cd49f" ] || { echo "gate leg m6-tape-load-48k: FAILED — guest 48K load missed Program: boot" >&2; exit 1; }
 echo "gate leg m6-tape-load-48k: 48K BASIC loads the tape identically in both flavors"
+
+echo "gate leg m6-ay-sound: an AY program is audible, and ay/ym shape it differently"
+AY="$ROOT/test-content/ay.sna"
+[ -f "$AY" ] || { echo "gate leg m6-ay-sound: FAILED — $AY missing (tests/make-ay-sna.py builds it)" >&2; exit 1; }
+SAVED_RUN_CONTENT="$RUN_CONTENT"
+SAVED_GGAME="$GGAME"
+RUN_CONTENT="$AY"
+cp "$AY" "$ROOT/build/guest/"
+GGAME="--game $(basename "$AY")"
+NAY=$(state_of --frames 600 --clock virtual)
+NAYV=$(field_of /tmp/gate_last.log run-native vhash)
+NAYM=$(field_of /tmp/gate_last.log run-native mhash)
+NYM=$(state_of --frames 600 --clock virtual --sound-chip ym)
+NYMM=$(field_of /tmp/gate_last.log run-native mhash)
+echo "gate leg m6-ay-sound: ay state=$NAY ym state=$NYM"
+[ "$NAYV" = "e791c111c6a10383" ] || { echo "gate leg m6-ay-sound: FAILED — the AY program did not run (border/screen is not the known-good red-border boot, got $NAYV)" >&2; exit 1; }
+[ "$NAY" != "$NYM" ] || { echo "gate leg m6-ay-sound: FAILED — ay and ym are identical; the setting does not shape sound (or the AY made none)" >&2; exit 1; }
+[ "$NAYM" != "$NYMM" ] || { echo "gate leg m6-ay-sound: FAILED — mixed audio identical for ay and ym" >&2; exit 1; }
+echo "gate leg m6-ay-sound: ay/ym mixed audio differs ($NAYM vs $NYMM)"
+on_guest_host guest-legs.sh 600 $GGAME
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GAY=$(field_of /tmp/gate_wbx.log guest state)
+GAYM=$(field_of /tmp/gate_wbx.log guest mhash)
+echo "gate leg m6-ay-sound: ay native=$NAY guest=$GAY"
+[ "$NAY" = "$GAY" ] || { echo "gate leg m6-ay-sound: FAILED — the AY run differs across flavors" >&2; exit 1; }
+[ "$NAYM" = "$GAYM" ] || { echo "gate leg m6-ay-sound: FAILED — AY mixed audio differs across flavors" >&2; exit 1; }
+printf '{"soundChip": "ym"}' > "$ROOT/build/guest/m-ym.json"
+on_guest_host guest-legs.sh 600 $GGAME --settings-json m-ym.json
+sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
+GYM=$(field_of /tmp/gate_wbx.log guest state)
+GYMM=$(field_of /tmp/gate_wbx.log guest mhash)
+echo "gate leg m6-ay-sound: ym native=$NYM guest=$GYM"
+[ "$NYM" = "$GYM" ] || { echo "gate leg m6-ay-sound: FAILED — the YM run differs across flavors" >&2; exit 1; }
+[ "$NYMM" = "$GYMM" ] || { echo "gate leg m6-ay-sound: FAILED — YM mixed audio differs across flavors" >&2; exit 1; }
+[ "$GAY" != "$GYM" ] || { echo "gate leg m6-ay-sound: FAILED — the guest cannot tell ay from ym either" >&2; exit 1; }
+RUN_CONTENT="$SAVED_RUN_CONTENT"
+GGAME="$SAVED_GGAME"
+echo "gate leg m6-ay-sound: the AY source is audible, ay/ym use different volume tables, both flavors agree"
 
 echo "gate leg m5-frontend: the real frontend boots content headless (boot/lag/determinism/input/rerecord/keybinds)"
 if [ "$(uname -s)" = "Linux" ]; then
