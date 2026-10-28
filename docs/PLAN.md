@@ -422,7 +422,7 @@ end to end; the snapshot exercises xSnapshot::Load.
   (eRom::Reset already picked sos48). m6-tape-menu-128k pins the menu
   screen (the old code gave e6c0..., seen failing) and the guest must
   match; m6-tape-load/-exact now type Enter on Tape Loader, with new
-  goldens (5de8.../4e60...); m6-tape-load-48k keeps the J "" goldens.
+  goldens (5de8.../aa87...); m6-tape-load-48k keeps the J "" goldens.
 - soundChip actually changes the sound now: Configure called SetChip only,
   but SetChip only masks register numbers; the audible difference is the
   volume table, which upstream's SetupSoundChip also sets. Configure now
@@ -434,3 +434,27 @@ end to end; the snapshot exercises xSnapshot::Load.
   loops. m6-ay-sound asserts the known-good screen, that ay and ym mixed
   audio differ (teeth: a silent AY would make them identical), and native
   == guest for both. Volume is 14, not 15: both volume tables agree at 15.
+
+## Audio mixing + tape start (2026-10-28, after the above)
+
+- MixedAudio was decoding eDeviceSound samples wrongly. SNDSAMPLE is ONE
+  int32 with left in the low word and right in the high word; the mixer
+  summed the packed int32 and clamped it to int16, so every nonzero sample
+  saturated to +32767. That was the buzz heard while a tape was playing
+  during boot and the distorted sound over AY music. It now unpacks both
+  words, sums beeper + AY per channel, clamps each, and writes real stereo.
+- The tape source is no longer mixed: it is a data signal (upstream offers
+  it as a separate "sound" choice, default AY), not machine audio. It is
+  still drained every frame. Boot with a tape inserted is now silent;
+  ay.sna's L/R now carry the ABC panning (L 9199, R 919).
+- Tapes are armed, not started, at open. The 128K menu polls EAR while it
+  boots and was consuming the first blocks before Tape Loader ran; EXO-TICAL
+  then started mid-tape and the fast-trap ate the rest (the loader sat on
+  "Tape Loader" forever). FrameAdvance now starts the armed tape when Enter
+  is pressed - the key that picks Tape Loader and the key that submits
+  LOAD "" - so the tape starts at position 0 when the loader begins, like
+  pressing Play at that moment. Verified with the local (copyrighted)
+  Driar and EXO-TICAL tapes: both load on a 128K and play stereo AY music;
+  before the fix they either stalled or misread the tape.
+- m6-tape-load-exact's golden moved to aa87... (the tape now starts at the
+  Enter, not at open); fast and 48K goldens are unchanged.

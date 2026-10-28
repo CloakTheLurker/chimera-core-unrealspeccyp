@@ -63,7 +63,23 @@ void Machine::Reset() {
     speccy->Device<eRom>()->SelectPage(eRom::ROM_128_1);
 }
 
+// Set whenever Enter is held in the current level; FrameAdvance uses it to
+// start an armed tape (the Enter that submits LOAD "" or picks Tape Loader).
+static bool g_enter_pressed = false;
+
 void Machine::FrameAdvance() {
+  // A tape opened while the 128K menu is up is armed, not started: the menu
+  // polls EAR, so a tape already playing would be consumed before the user
+  // picks Tape Loader (the loader then starts mid-tape). Start it when Enter
+  // is pressed - the key that selects Tape Loader and the key that submits
+  // LOAD "" - which is the moment a real user presses Play. The tape only
+  // advances on EAR reads, so a 48K or 128 BASIC LOAD starts from position 0
+  // even though the key was pressed slightly earlier.
+  if(xPlatform::TapeStartPending() && g_enter_pressed) {
+    speccy->Device<eTape>()->Start();
+    xPlatform::TapeStartConsumed();
+  }
+  g_enter_pressed = false;
   // Upstream installs the fast-tape step only while a tape runs (and takes
   // it off when the tape stops); mirror that exactly. The step's ROM-pattern
   // fast paths (incl. delay-loop acceleration) must never fire outside a
@@ -81,6 +97,7 @@ void Machine::FrameAdvance() {
 // console Space/Enter aliases, P5 the full keyboard in upstream eKeyboard
 // matrix order.
 struct ButtonBinding { bool kbd; char key; };
+
 static const ButtonBinding kButtons[] = {
   {false,'u'}, {false,'d'}, {false,'l'}, {false,'r'}, {false,'f'}, // P1 Kempston U/D/L/R/Fire
   {true,'9'}, {true,'8'}, {true,'6'}, {true,'7'}, {true,'0'},      // P2 Sinclair
@@ -127,6 +144,8 @@ void Machine::ApplyLastMask() {
     const ButtonBinding& b = kButtons[i];
     (b.kbd ? kbd : joy)[(unsigned char)b.key] = true;
   }
+  if(kbd[(unsigned char)'e'])
+    g_enter_pressed = true;
   bool doneK[128] = {}, doneJ[128] = {};
   for(int i = 0; i < ButtonCount(); i++) {
     const ButtonBinding& b = kButtons[i];
@@ -145,30 +164,34 @@ void Machine::ApplyLastMask() {
   }
 }
 
-// MixedAudio: sum the three sources per sample like eSoundMixer::Update
-// (tools/sound_mixer.cpp: int sums of the three int32 streams), clamped to
-// int16 stereo pairs. min-ready across sources, then drain all — identical
-// in native and guest, so the parity leg compares one mix.
+// MixedAudio: sum the machine's two audible sources (beeper and AY) and
+// write int16 stereo pairs. An eDeviceSound sample is ONE int32 with the
+// left channel in the low word and the right in the high word
+// (device_sound.h, SNDSAMPLE): it must be unpacked, not treated as a mono
+// value. Clamping the packed int32 saturated every nonzero sample to
+// +32767, which is the buzz heard while a tape played and over AY music.
+// The tape device (source 2) is a data signal, not machine audio (upstream
+// offers it as a separate "sound" choice, default AY); mix beeper + AY and
+// drain the tape so its ring buffer never overruns. min-ready over the two
+// mixed sources, then drain all three — identical in native and guest, so
+// the parity leg compares one mix.
 uint32_t Machine::MixedAudio(int16_t* stereo, uint32_t capacity) {
   uint32_t ready0 = AudioDataReady(0) / 4;
   uint32_t ready1 = AudioDataReady(1) / 4;
-  uint32_t ready2 = AudioDataReady(2) / 4;
-  uint32_t n = ready0;
-  if(ready1 < n) n = ready1;
-  if(ready2 < n) n = ready2;
+  uint32_t n = ready0 < ready1 ? ready0 : ready1;
   if(n * 2 > capacity) n = capacity / 2;
   const int32_t* s0 = (const int32_t*)AudioData(0);
   const int32_t* s1 = (const int32_t*)AudioData(1);
-  const int32_t* s2 = (const int32_t*)AudioData(2);
   for(uint32_t i = 0; i < n; i++) {
-    int32_t v = s0[i] + s1[i] + s2[i];
-    if(v > 32767) v = 32767;
-    if(v < -32768) v = -32768;
-    stereo[i * 2] = (int16_t)v;      // mono machine: same on both channels
-    stereo[i * 2 + 1] = (int16_t)v;
+    int32_t l = (int16_t)(s0[i] & 0xFFFF) + (int16_t)(s1[i] & 0xFFFF);
+    int32_t r = (int16_t)(s0[i] >> 16) + (int16_t)(s1[i] >> 16);
+    if(l > 32767) l = 32767; else if(l < -32768) l = -32768;
+    if(r > 32767) r = 32767; else if(r < -32768) r = -32768;
+    stereo[i * 2] = (int16_t)l;
+    stereo[i * 2 + 1] = (int16_t)r;
   }
   AudioDataUse(0, AudioDataReady(0));
   AudioDataUse(1, AudioDataReady(1));
-  AudioDataUse(2, AudioDataReady(2));
+  AudioDataUse(2, AudioDataReady(2)); // tape: drained, never mixed
   return n * 2;
 }

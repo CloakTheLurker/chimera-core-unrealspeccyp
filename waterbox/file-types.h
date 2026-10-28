@@ -20,5 +20,14 @@ namespace xPlatform
 // when the extension names no registered type or the parse fails.
 bool OpenGameFile(eSpeccy* speccy, const char* path);
 
+// A tape opened while the 128K menu is up must not play yet: the menu ROM
+// polls EAR during boot, and a playing tape would be consumed before the
+// user picks Tape Loader (the loader then starts mid-tape). Keep it armed
+// and start it when Enter is pressed - the key that selects Tape Loader and
+// the key that submits LOAD "" - which is when a real user presses Play.
+// Machine::FrameAdvance consumes the flag.
+bool TapeStartPending();
+void TapeStartConsumed();
+
 }
 //namespace xPlatform

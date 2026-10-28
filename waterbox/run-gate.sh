@@ -322,7 +322,7 @@ echo "gate leg m6-kbd-alias-space: native=$NS57 guest=$GS"
 [ "$NS57" = "$GS" ] || { echo "gate leg m6-kbd-alias-space: FAILED — keyboard run differs across flavors" >&2; exit 1; }
 echo "gate leg m6-kbd-alias-space: console and P5 aliases agree in both flavors"
 
-echo "gate leg m6-tape-menu-128k: opening a tape keeps the 128K menu (not the 48K ROM)"
+echo "gate leg m6-tape-menu-128k: opening a tape keeps the 128K menu (not the 48K ROM) and is silent"
 RUN_CONTENT="$ROOT/test-content/boot.tap"
 cp "$RUN_CONTENT" "$ROOT/build/guest/"
 GGAME="--game $(basename "$RUN_CONTENT")"
@@ -330,16 +330,20 @@ cp "$ROOT/waterbox/tests/typeload.txt" "$ROOT/build/guest/typeload.txt"
 cp "$ROOT/waterbox/tests/typetapeloader.txt" "$ROOT/build/guest/typetapeloader.txt"
 NTAP=$(state_of --frames 600 --clock virtual)
 NTAPV=$(field_of /tmp/gate_last.log run-native vhash)
-echo "gate leg m6-tape-menu-128k: plain=$NTAP screen=$NTAPV"
+NTAPM=$(field_of /tmp/gate_last.log run-native mhash)
+echo "gate leg m6-tape-menu-128k: plain=$NTAP screen=$NTAPV audio=$NTAPM"
 [ "$NTAPV" = "6626bf8fa8d724dd" ] || { echo "gate leg m6-tape-menu-128k: FAILED — a tape on the 128K is not the 128K menu (got $NTAPV); opening it switched ROM" >&2; exit 1; }
+[ "$NTAPM" = "0c6dee4372a2dc83" ] || { echo "gate leg m6-tape-menu-128k: FAILED — the boot is not silent (got $NTAPM); a stopped tape or a bad mixer is audible" >&2; exit 1; }
 on_guest_host guest-legs.sh 600 $GGAME
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 GTAP=$(field_of /tmp/gate_wbx.log guest state)
 GTAPV=$(field_of /tmp/gate_wbx.log guest vhash)
+GTAPM=$(field_of /tmp/gate_wbx.log guest mhash)
 echo "gate leg m6-tape-menu-128k: native=$NTAP guest=$GTAP"
 [ "$NTAP" = "$GTAP" ] || { echo "gate leg m6-tape-menu-128k: FAILED — the 128K tape boot differs across flavors" >&2; exit 1; }
+[ "$NTAPM" = "$GTAPM" ] || { echo "gate leg m6-tape-menu-128k: FAILED — boot audio differs across flavors (native=$NTAPM guest=$GTAPM)" >&2; exit 1; }
 [ "$GTAPV" = "6626bf8fa8d724dd" ] || { echo "gate leg m6-tape-menu-128k: FAILED — guest 128K tape boot is not the 128K menu (got $GTAPV)" >&2; exit 1; }
-echo "gate leg m6-tape-menu-128k: the 128K menu stays up with a tape playing, in both flavors"
+echo "gate leg m6-tape-menu-128k: the 128K menu stays up, the tape armed and silent, in both flavors"
 
 echo "gate leg m6-tape-load: the menu's Tape Loader loads it (fast loader)"
 NTLOAD=$(state_of --frames 600 --clock virtual --type-file "$ROOT/waterbox/tests/typetapeloader.txt")
@@ -361,7 +365,7 @@ NTLOADE=$(state_of --frames 600 --clock virtual --no-fast-tape --type-file "$ROO
 NTLOADEV=$(field_of /tmp/gate_last.log run-native vhash)
 echo "gate leg m6-tape-load-exact: native=$NTLOADE plain=$NTAP"
 [ "$NTLOADE" != "$NTAP" ] || { echo "gate leg m6-tape-load-exact: FAILED — no load without the trap either" >&2; exit 1; }
-[ "$NTLOADEV" = "4e60f88199031fcd" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load did not reach Program: boot + 0 OK (got $NTLOADEV)" >&2; exit 1; }
+[ "$NTLOADEV" = "aa87be25d9f68bcb" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load did not reach Program: boot + 0 OK (got $NTLOADEV)" >&2; exit 1; }
 printf '{"fastTape": false}' > "$ROOT/build/guest/m-nofast.json"
 on_guest_host guest-legs.sh 600 $GGAME --settings-json m-nofast.json --type-file typetapeloader.txt
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
@@ -369,7 +373,7 @@ GE=$(field_of /tmp/gate_wbx.log guest state)
 GEV=$(field_of /tmp/gate_wbx.log guest vhash)
 echo "gate leg m6-tape-load-exact: native=$NTLOADE guest=$GE"
 [ "$NTLOADE" = "$GE" ] || { echo "gate leg m6-tape-load-exact: FAILED — exact load differs across flavors" >&2; exit 1; }
-[ "$GEV" = "4e60f88199031fcd" ] || { echo "gate leg m6-tape-load-exact: FAILED — guest exact load missed Program: boot" >&2; exit 1; }
+[ "$GEV" = "aa87be25d9f68bcb" ] || { echo "gate leg m6-tape-load-exact: FAILED — guest exact load missed Program: boot" >&2; exit 1; }
 echo "gate leg m6-tape-load-exact: cycle-exact loading agrees across flavors"
 
 echo "gate leg m6-tape-load-48k: same tape on the 48K machine"

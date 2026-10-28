@@ -30,6 +30,12 @@ static eSpeccy* g_files_machine = 0;
 void UseMachineForFiles(eSpeccy* speccy) { g_files_machine = speccy; }
 static eSpeccy* FilesMachine() { return g_files_machine; }
 
+// See file-types.h: a tape is armed here, and Machine::FrameAdvance starts
+// it once the 48 BASIC ROM is selected.
+static bool g_tape_start_pending = false;
+bool TapeStartPending() { return g_tape_start_pending; }
+void TapeStartConsumed() { g_tape_start_pending = false; }
+
 static struct eFileTypeTape : public eFileType
 {
   virtual bool Open(const void* data, size_t data_size) const
@@ -59,7 +65,13 @@ static struct eFileTypeTape : public eFileType
       // 48 BASIC only when the user picks Tape Loader.
       if(!FilesMachine()->Mode48k())
         FilesMachine()->Devices().Get<eRom>()->SelectPage(eRom::ROM_128_1);
-      FilesMachine()->Device<eTape>()->Start();
+      // Arm, do not start. The 128K menu polls EAR while it boots and would
+      // eat the first blocks before Tape Loader runs (the loader then starts
+      // mid-tape and the fast-trap misreads the rest). FrameAdvance starts
+      // it when Enter is pressed: the key that selects Tape Loader and the
+      // key that submits LOAD "" - the equivalent of pressing Play when the
+      // loader begins.
+      g_tape_start_pending = true;
     }
     return ok;
   }
