@@ -42,8 +42,10 @@ fi
 CXX=${CXX:-g++}
 CC=${CC:-gcc}
 ZLIB_SRCS=""
+ZLIB_LIBS=""
 if [ -f /usr/include/zlib.h ]; then
   echo "build-native: system zlib found."
+  ZLIB_LIBS="-lz"
 else
   echo "build-native: no system zlib — using vendored 3rdparty/zlib (as upstream cmake does)."
   ZLIB_SRCS="$UP/3rdparty/zlib"
@@ -93,7 +95,8 @@ if [ -n "$ZLIB_SRCS" ]; then
   done
 fi
 echo "build-native: linking..."
-"$CXX" "$OBJ"/*.o -o "$OUT/run-native" ${LDFLAGS:-}
+# shellcheck disable=SC2086
+"$CXX" "$OBJ"/*.o -o "$OUT/run-native" ${LDFLAGS:-} $ZLIB_LIBS
 echo "build-native: $OUT/run-native"
 if command -v ldd >/dev/null 2>&1; then
   if ldd "$OUT/run-native" 2>/dev/null | grep -i -E 'SDL|libGL|openal|wx' ; then
