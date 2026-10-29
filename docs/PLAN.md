@@ -201,7 +201,7 @@ Porting-doc mapping: item 4 (picture) was already done in M2 (ULA framebuffer re
 ## Publishing (unofficial, by hand — decided 2026-10-28)
 
 Owner decision: the core is published as an **unofficial** repository,
-`ToolAssisted-run/chimera-core-unrealspeccyp`, branch `main`. No roster row,
+`CloakTheLurker/chimera-core-unrealspeccyp`, branch `main`. No roster row,
 no `publish` job, no schedule. Chimera downloads nothing; a user takes the
 package from a release (README.md, "Install").
 

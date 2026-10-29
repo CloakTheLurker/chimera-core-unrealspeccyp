@@ -10,7 +10,7 @@ Fresh clone to gated package — Chimera is cloned beside the core, because
 
 ```
 git clone --recursive https://github.com/ToolAssisted-run/chimera ../chimera
-git clone https://github.com/ToolAssisted-run/chimera-core-unrealspeccyp
+git clone https://github.com/CloakTheLurker/chimera-core-unrealspeccyp
 cd chimera-core-unrealspeccyp
 ./waterbox/build-package.sh -r ../chimera
 ```
