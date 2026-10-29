@@ -24,7 +24,12 @@ concurrency:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    # ubuntu-24.04, not ubuntu-latest: the latter now ships GCC 15.2, whose
+    # libiberty declares basename(const char *) while musl's string.h declares
+    # basename() with no prototype — miniBox's guest libstdc++ build stops on
+    # the collision. GCC 13.3 on 24.04 builds it. Revisit when miniBox no
+    # longer takes the host GCC version for that build.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
