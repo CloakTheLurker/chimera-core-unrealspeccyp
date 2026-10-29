@@ -1,4 +1,8 @@
 #!/bin/sh
+# LEGACY: this suite drives the old .NET Chimera (mono + build/Chimera.exe).
+# The frontend is now Qt/C++; this file is kept for the port to the new window
+# and is not called by run-gate.sh or CI.
+#
 # run-frontend.sh — the M5 frontend gate (Level B): the real Chimera frontend,
 # headless under mono+Xvfb, boots the packaged core with distributable
 # content, and every leg says what it compared.

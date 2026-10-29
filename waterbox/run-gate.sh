@@ -442,14 +442,8 @@ RUN_CONTENT="$SAVED_RUN_CONTENT"
 GGAME="$SAVED_GGAME"
 echo "gate leg m6-ay-sound: the AY source is audible, ay/ym use different volume tables, both flavors agree"
 
-echo "gate leg m5-frontend: the real frontend boots content headless (boot/lag/determinism/input/rerecord/keybinds)"
-if [ "$(uname -s)" = "Linux" ]; then
-  sh "$ROOT/waterbox/tests/run-frontend.sh" 2>&1 | tee "$ROOT/build/guest/fe-gate.log"
-  grep -q "fe: done" "$ROOT/build/guest/fe-gate.log" || { echo "gate leg m5-frontend: FAILED — frontend suite did not finish green" >&2; exit 1; }
-else
-  on_guest_host fe-gate.sh
-  grep -q "fe: done" "$ROOT/build/guest/fe-gate.log" || { echo "gate leg m5-frontend: FAILED — frontend suite did not finish green" >&2; exit 1; }
-  grep -h "^fe leg" "$ROOT/build/guest/fe-gate.log"
-fi
-
-echo "gate: done (all legs green)."
+# The window test (waterbox/tests/run-frontend.sh) is deliberately not part of
+# this gate: it drives the old .NET frontend and has not been ported to the Qt
+# window yet. CI runs Chimera's package contract test against the package
+# instead (see .github/workflows/chimera.yml).
+echo "gate: done (all core legs green; the window test is not run here)."

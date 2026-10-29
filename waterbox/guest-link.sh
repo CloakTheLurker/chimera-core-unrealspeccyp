@@ -16,12 +16,14 @@ stamp() { date "+guest-link: [%H:%M:%S] $1"; }
 stamp "start"
 sh "$CORE/waterbox/apply-patches.sh" "$U" "$UP"
 # Toolchain source+build: MB_SRC_DIR/MB_BUILD_DIR override the MINIBOX-derived
-# defaults. The override exists because musl's (and libstdc++'s) configure
-# cannot handle spaces in srcdir/builddir — on a spaced checkout (WSL here)
-# miniBox lives in a space-free native mirror (tools/wsl/mb-sync.sh); on CI
-# Linux the checkout itself is space-free and the defaults just work.
+# defaults. The guest C++ toolchain lives in miniBox's meson-cpp build (the
+# host build in meson-linux is Chimera's and has no guest sysroot). The override
+# exists because musl's (and libstdc++'s) configure cannot handle spaces in
+# srcdir/builddir — on a spaced checkout (WSL here) miniBox lives in a
+# space-free native mirror (tools/wsl/mb-sync.sh); on CI Linux the checkout
+# itself is space-free and the defaults just work.
 MB_SRC="${MB_SRC_DIR:-$MINIBOX}"
-MB_BUILD="${MB_BUILD_DIR:-$MINIBOX/build/meson-linux}"
+MB_BUILD="${MB_BUILD_DIR:-$MINIBOX/build/meson-cpp}"
 SYSROOT="$MB_BUILD/guest-sysroot"
 MUSL_GCC="$MB_BUILD/musl-gcc"
 EMULIBC_OBJ="$MB_BUILD/source/guest/emulibc.c.o"

@@ -1,12 +1,14 @@
-# Unofficial core: build, gate and Chimera's contract tests only. No publish
-# job and no daily schedule — an unofficial core is not in Chimera's
+# Unofficial core: build, core gate and Chimera's package contract test. No
+# publish job and no daily schedule — an unofficial core is not in Chimera's
 # official-cores.json and publishes nowhere on its own. A release is cut by
 # hand from a green run's artifact (see "Publishing" in README.md).
 #
-# What a runner proves here: the native reference and the sandbox agree, the
-# real frontend (mono + Xvfb) boots content and resolves every declared
-# button, and Chimera's contract tests open the package. The ROM/game matrix
-# stays local: ROMs/ and games are not distributable (docs/BUILDING.md).
+# What a runner proves here: the native reference and the sandbox agree (the
+# core gate, with distributable test content), and Chimera's package contract
+# test opens the package. The ROM/game matrix stays local (ROMs/ and games are
+# not distributable). The window test, waterbox/tests/run-frontend.sh, still
+# drives the old .NET frontend and is not run until it is ported to the Qt
+# window; nothing here claims otherwise.
 name: chimera-core-unrealspeccyp CI
 
 on:
@@ -15,6 +17,10 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 
 jobs:
   gate:
@@ -31,44 +37,38 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential meson ninja-build python3 git cmake pkg-config \
-            perl flex bison mono-complete xvfb \
-            libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev
-
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+      - name: Cache Qt
+        uses: actions/cache@v4
         with:
-          dotnet-version: '8.0'
+          path: ~/qt
+          key: qt-6.12.0-linux-aqt-3.3.0
 
-      - name: Build miniBox (sandbox and guest toolchain)
-        # The guest link asks this build for the musl + libstdc++ targets by
-        # name; building the tree first also gives the guest legs the host
-        # library they link run-wbx against.
+      - name: Build Chimera (engine, runner, window, contract test)
+        # Installs the system packages, then Qt 6.12 from Qt's archives, then
+        # builds the engine, chimera-run, the window and test-packages.
+        run: chimera/tools/ci-chimera.sh "$HOME/qt"
+
+      - name: Build miniBox (host runtime and guest C++ toolchain)
+        # The guest link uses meson-cpp (its sysroot and libstdc++); the guest
+        # legs link run-wbx against the host runtime in meson-linux.
         run: |
           mb="$PWD/chimera/extern/chimera-common-minibox"
           [ -f "$mb/build/meson-linux/build.ninja" ] \
-            || meson setup "$mb/build/meson-linux" "$mb" -Dguest_cpp=true
+            || meson setup "$mb/build/meson-linux" "$mb"
           meson compile -C "$mb/build/meson-linux"
+          [ -f "$mb/build/meson-cpp/build.ninja" ] \
+            || meson setup "$mb/build/meson-cpp" "$mb" -Dguest_cpp=true
+          meson compile -C "$mb/build/meson-cpp"
 
-      - name: Build Chimera's engine
-        working-directory: chimera
-        run: |
-          meson setup build/meson-linux --prefix "$PWD/build" --libdir dll
-          meson compile -C build/meson-linux
-          meson install -C build/meson-linux
-
-      - name: Build Chimera's interface
-        working-directory: chimera
-        run: dotnet build source/gui/Chimera.sln -c Release /nodeReuse:false -p:UseSharedCompilation=false
-
-      - name: Gate the package
-        # Everything CI runs: native, guest, the whole gate (including the
-        # frontend) and the package. build-package.sh builds what it needs.
+      - name: Gate the core and build the package
+        # Everything the core's gate runs: native, guest, m0-m6. The window
+        # test is not part of it yet (see the header).
         run: ./waterbox/build-package.sh -r chimera
+
+      - name: Chimera's contract test against the package
+        env:
+          CHIMERA_CORES_DIR: ${{ github.workspace }}/dist
+        run: chimera/build/meson-linux/source/ui/test-packages
 
       - name: Upload the package
         uses: actions/upload-artifact@v4
@@ -77,59 +77,12 @@ jobs:
           path: dist/*.chimeraCore
           if-no-files-found: error
 
-      - name: Upload the gate log on failure
+      - name: Upload the build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: gate-log
-          path: build/guest/*.log
+          name: build-logs
+          path: |
+            build/guest/*.log
+            build/native/*.log
           if-no-files-found: ignore
-
-  contract:
-    # Chimera's contract tests open the built package (no content needed).
-    # Same shape as chimera's own "frontend against real packages" job:
-    # mono hosts the net48 tests on Linux; libchimera reads the package.
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    needs: gate
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: ToolAssisted-run/chimera
-          path: chimera
-          submodules: recursive
-          fetch-depth: 1
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            meson ninja-build build-essential cmake pkg-config python3 \
-            mono-complete \
-            libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0'
-      - name: Build native dependencies (installs into build/dll)
-        working-directory: chimera
-        run: |
-          meson setup build/meson-linux --prefix "$PWD/build" --libdir dll
-          meson compile -C build/meson-linux
-          meson install -C build/meson-linux
-      - name: Build the tests
-        working-directory: chimera
-        run: dotnet build source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj -c Release /nodeReuse:false -p:UseSharedCompilation=false
-      - name: Download the gated package
-        uses: actions/download-artifact@v4
-        with:
-          name: unrealspeccyp-${{ github.sha }}
-          path: package
-      - name: Contract tests against the package
-        working-directory: chimera
-        env:
-          CHIMERA_CORES_DIR: ${{ github.workspace }}/package
-        run: |
-          dotnet test source/gui/Chimera.Tests.Client.Common/Chimera.Tests.Client.Common.csproj \
-            -c Release --no-build --nologo \
-            --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"

@@ -89,14 +89,16 @@ Not there yet:
   cannot be opened);
 - no per-game settings (the in-game key presets are picked by hand);
 - one content file per project;
-- No Kempston mouse or other add-on interfaces.
+- No Kempston mouse or other add-on interfaces;
+- the window test (`waterbox/tests/run-frontend.sh`) still drives the old
+  .NET frontend and is not run until it is ported to the Qt window. CI runs
+  Chimera's package contract test instead.
 
 ## Build
 
-Requirements: a C++ compiler, meson, ninja, python3, git; for the frontend
-gate also mono and Xvfb, with Chimera built. The guest links on Linux
-natively, or inside WSL Ubuntu from a Windows checkout. Fresh clone to gated
-package, with Chimera's checkout beside it:
+Requirements: a C++ compiler, meson, ninja, python3, git. The guest links on
+Linux natively, or inside WSL Ubuntu from a Windows checkout. Fresh clone to
+gated package, with Chimera's checkout beside it:
 
 ```
 git clone --recursive https://github.com/ToolAssisted-run/chimera ../chimera
@@ -134,14 +136,16 @@ one with no git history stamps `+local`; neither is publishable.
 - **M0 — skeleton + headless native build.**
 - **M1 — virtual time (DONE 2026-10-03).** The seam is the pacing layer; a
   300 ms host stall does not move the machine.
-- **M2 — guest build (DONE 2026-10-08).** `core.wbx` is 670KB, hygiene-clean,
+- **M2 — guest build (DONE 2026-10-08).** `core.wbx` is 656KB, hygiene-clean,
   and bit-identical to the native build over 600 frames.
 - **M3 — input levels + savestates (DONE 2026-10-26).** Rerecord and
   two-process session legs green.
 - **M4 — the package (DONE 2026-10-27).** The engine ABI, buttons, settings,
   firmware, keybinds and licences; Chimera's contract tests 26/26.
 - **M5 — content loading + frontend gate (DONE 2026-10-27).** Distributable
-  test content, tapes and snapshots, the real frontend boots it headless.
+  test content, tapes and snapshots; the real frontend of the time (the .NET
+  window) booted it headless. The window test has not been ported to the Qt
+  window yet — see Status.
 
 ## Licence
 

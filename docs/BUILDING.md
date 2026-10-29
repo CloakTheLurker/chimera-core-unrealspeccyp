@@ -1,9 +1,9 @@
 # Building chimera-core-unrealspeccyp
 
 Requirements: a C++ compiler, meson, ninja, python3, git. The guest links on
-Linux natively, or inside WSL Ubuntu from a Windows checkout. The frontend
-gate also needs mono and Xvfb, with Chimera itself built (its engine and its
-interface).
+Linux natively, or inside WSL Ubuntu from a Windows checkout. The package
+contract test needs Chimera built (tools/ci-chimera.sh does that on a run-
+ner); the core gate does not.
 
 Fresh clone to gated package — Chimera is cloned beside the core, because
 `build-package.sh` takes its checkout with `-r`:
@@ -16,7 +16,7 @@ cd chimera-core-unrealspeccyp
 ```
 
 That builds the native reference, links `core.wbx` through the musl guest
-toolchain, runs the full gate, stamps version/versionDate from the commit,
+toolchain, runs the core gate, stamps version/versionDate from the commit,
 lays out `dist/licenses/`, and zips
 `dist/unrealspeccyp-<sha>.chimeraCore`.
 
@@ -34,10 +34,10 @@ What each script does:
 - `waterbox/run-gate.sh` — every leg says what it compared; see
   `docs/PLAN.md`.
 - `waterbox/check-wbx.sh` — miniBox guest hygiene (needs `MINIBOX_DIR`).
-- `waterbox/tests/run-frontend.sh` — the frontend suite: boot, lag,
-  determinism, input, rerecord and keybinds through the real Chimera window,
-  headless under mono + Xvfb. It needs `../chimera/build/Chimera.exe` and
-  `../chimera/build/dll`.
+- `waterbox/tests/run-frontend.sh` — LEGACY: the old .NET window test (boot,
+  lag, determinism, input, rerecord, keybinds). It needs the old `Chimera.exe`
+  and mono/Xvfb, is not called by the gate or CI, and is kept for the port to
+  the Qt window.
 - `tools/wsl/mb-sync.sh` — copies miniBox to a space-free WSL-native dir
   (musl/libstdc++ configures die on spaces in srcdir/builddir).
 - `tools/wsl/guest-legs.sh` — builds `run-wbx` (host driver) and runs it.
@@ -56,11 +56,17 @@ move it.
 ## What CI does
 
 `.github/workflows/chimera.yml` runs on a fresh Ubuntu clone: it checks out
-Chimera with submodules, builds miniBox with `-Dguest_cpp=true`, builds
-Chimera's engine and interface, then runs `./waterbox/build-package.sh -r
-chimera` — the whole gate, frontend included — and uploads the package. A
-second job builds Chimera's natives and runs `InstalledCorePackagesTests` and
-`MnemonicUniquenessTests` against that package with `CHIMERA_CORES_DIR`.
+Chimera with submodules, builds the current Qt Chimera with
+`chimera/tools/ci-chimera.sh`, builds miniBox's host runtime (`meson-linux`)
+and guest C++ toolchain (`meson-cpp`), then runs `./waterbox/build-package.sh
+-r chimera` — the core gate — and uploads the package. It then runs Chimera's
+package contract test against the package:
+
+```
+CHIMERA_CORES_DIR=<dist> chimera/build/meson-linux/source/ui/test-packages
+```
+
+The window test is not in CI yet (see above).
 
 The ROM/game matrix (`waterbox/tests/run-rom-matrix.sh`) is local-only: it
 needs copyrighted content from `ROMs/`, which is gitignored and never on a

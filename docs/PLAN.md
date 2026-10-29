@@ -206,10 +206,10 @@ no `publish` job, no schedule. Chimera downloads nothing; a user takes the
 package from a release (README.md, "Install").
 
 CI (`.github/workflows/chimera.yml`) proves what a public runner can prove:
-the native reference and the sandbox agree, the real frontend (mono + Xvfb)
-boots content and resolves every declared button, and Chimera's contract
-tests open the package. The ROM/game matrix stays local: `ROMs/` and games
-are not distributable.
+the native reference and the sandbox agree, and Chimera's package contract
+test (`source/ui/test-packages`) opens the package. The ROM/game matrix stays
+local (`ROMs/` and games are not distributable), and the window test is not
+ported to the Qt frontend yet, so nothing claims it ran.
 
 A release is cut by hand:
 
@@ -500,16 +500,18 @@ ready; the automation and the reader-facing half were not.
   `CHIMERA_ROOT` override) and finds Chimera beside the core or inside the
   CI workspace; `GATE_SCRATCH` carries the hand-off files (`/var/tmp/chimera-usp-gate`
   under WSL, `build/guest/scratch` on Linux); `guest-legs.sh` builds the
-  miniBox host library if a fresh checkout lacks it; `build-native` and the
-  frontend suite check their prerequisites with a message instead of a
-  confusing failure.
-- CI installs the frontend's dependencies, builds miniBox with
-  `-Dguest_cpp=true`, builds Chimera's engine and interface, and runs the
-  whole gate; the contract job is unchanged. The header says the ROM/game
-  matrix stays local.
-- `build-package.sh` (and the frontend's test package) now stamp `-dirty`
-  when tracked files differ from the commit, `+local` without git. A release
-  can therefore not cite a version the tree does not match.
+  miniBox host library if a fresh checkout lacks it; `build-native` checks its
+  prerequisites with a message instead of a confusing failure.
+- **Chimera was rewritten under us.** `source/gui` (the .NET frontend) is
+  gone; the window is Qt/C++ and `tools/ci-chimera.sh` builds it. The first
+  CI run failed on `source/gui/Chimera.sln`. The workflow now builds the
+  current Chimera, miniBox's host (`meson-linux`) and guest (`meson-cpp`)
+  toolchains, runs the core gate, and runs `test-packages` against the
+  package. The window test still drives the old .NET frontend and is not run
+  until ported; the workflow header says so.
+- `build-package.sh` now stamps `-dirty` when tracked files differ from the
+  commit, `+local` without git. A release can therefore not cite a version
+  the tree does not match.
 - Reader-facing: README gained install, what-you-bring, buttons, settings,
   status and publishing sections; `COPYING` carries the GPL-3.0 text and
   `LICENSE.md` says what it covers — including that the ROM images at
@@ -520,6 +522,6 @@ ready; the automation and the reader-facing half were not.
   paths, one names a copyrighted tape, and the gate does not use them.
 - Tested from a fresh clone at a space-free path, with Chimera beside it and
   a fresh miniBox toolchain: `./waterbox/build-package.sh -r ../chimera`
-  green end to end (native, guest, m0-m6, frontend), stamped the commit
-  with no `-dirty`. The same build from a dirty tree stamps `-dirty`, as it
-  should.
+  green end to end (native, guest, m0-m6), stamped the commit with no
+  `-dirty`. That was against the .NET Chimera; the Qt run is the CI run.
+  The same build from a dirty tree stamps `-dirty`, as it should.

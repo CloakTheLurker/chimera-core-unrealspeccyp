@@ -15,9 +15,9 @@ a green CI run's artifact (README.md, "Publishing").
   `guest-link.sh`, `guest-syscalls.cpp`, and the four declarations
   (`waterbox.config`, `file_slots.json`, `default_keybinds.json`,
   `package-licenses.json`).
-- `waterbox/tests/` — the frontend suite (`run-frontend.sh`), its Lua
-  scripts, the distributable test content's generators, and the local-only
-  ROM matrix.
+- `waterbox/tests/` — the window test (`run-frontend.sh`, legacy .NET and not
+  run), its Lua scripts, the distributable test content's generators, and the
+  local-only ROM matrix.
 - `tools/wsl/` — the WSL legs (guest link, host driver runs, miniBox mirror)
   and `env.sh`, which derives every path from the caller's location.
 - `docs/PLAN.md` — milestones and the reasoning behind every decision.
@@ -32,20 +32,20 @@ a green CI run's artifact (README.md, "Publishing").
 MINIBOX_DIR=../chimera/extern/chimera-common-minibox ./waterbox/build-guest.sh
 ./waterbox/run-gate.sh                         # every leg says what it compared
 ./waterbox/build-package.sh -r ../chimera      # everything CI runs
-CHIMERA_CORES_DIR=<dist> dotnet test <Chimera.Tests.Client.Common> -c Release --filter "FullyQualifiedName~InstalledCorePackagesTests|FullyQualifiedName~MnemonicUniquenessTests"
+CHIMERA_CORES_DIR=<dist> ../chimera/build/meson-linux/source/ui/test-packages
 ```
 
 `build-package.sh` builds what it needs and stamps the commit; a tree with
-tracked modifications stamps `-dirty`, which is not publishable. The frontend
-leg needs Chimera built (engine and interface), mono and Xvfb. Guest legs
+tracked modifications stamps `-dirty`, which is not publishable. Guest legs
 stage files in `GATE_SCRATCH` (under WSL `/var/tmp/chimera-usp-gate`, on Linux
-`build/guest/scratch`).
+`build/guest/scratch`). The window test still targets the old .NET frontend
+and is not run; CI runs Chimera's contract test instead.
 
 ## Rules
 
 - The engine contract is law: `FrameAdvance(uint64_t)` (button i = bit i
   of `input.buttons`), optional `SetButton(int,int)`. Check
-  `chimera/source/gui/Chimera.Emulation.Common/Waterbox/` before inventing.
+  `chimera/source/engine/` before inventing.
 - Button order in `waterbox.config` is the movie contract: NEVER reorder.
   There are 62 (four presets × 5, Space/Enter, the 40-key Spectrum keyboard).
 - Input is levels, not events, applied whole every frame in both flavors.
@@ -53,7 +53,8 @@ stage files in `GATE_SCRATCH` (under WSL `/var/tmp/chimera-usp-gate`, on Linux
 - No absolute paths, no `$HOME` in build scripts (`MINIBOX_DIR` comes down
   from `build-package.sh -r`; `env.sh` derives the rest). Quote every path
   (spaces are load-bearing).
-- CI is a fresh Linux clone and runs the whole gate, frontend included. What
-  it cannot run is the ROM/game matrix; say so when reporting.
+- CI is a fresh Linux clone: it builds the current Chimera (Qt), runs the core
+  gate and Chimera's package contract test. It cannot run the ROM/game matrix
+  or the unported window test; say so when reporting.
 - Commits: subject `type(scope): what changed`; body what changed, why, and
   how it was tested, with the numbers. Stage explicit paths.
