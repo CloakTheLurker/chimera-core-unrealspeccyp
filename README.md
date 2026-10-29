@@ -4,7 +4,7 @@ UnrealSpeccyP (Pentagon 128K ZX-Spectrum) as a [Chimera](https://github.com/Tool
 waterbox core. It produces one file, `unrealspeccyp-<version>.chimeraCore`,
 that goes in Chimera's `Cores` folder.
 
-Upstream: djdron/UnrealSpeccyP, pinned to `0.0.86.30`
+Upstream: [djdron/UnrealSpeccyP](https://github.com/djdron/UnrealSpeccyP), pinned to `0.0.86.30`
 (`cores/UnrealSpeccyP-0.0.86.30.tar.gz`, sha256
 `8cc28f375c8cfb324fbe72f1f0d403d15f8c4b3c3622b008dcb8b0059fd79579`),
 vendored at `extern/upstream/` (never edited in place — see `patches/`).
@@ -12,6 +12,8 @@ vendored at `extern/upstream/` (never edited in place — see `patches/`).
 **This is an unofficial core.** It is not in Chimera's `official-cores.json`,
 nothing publishes it automatically, and Chimera downloads nothing itself.
 Releases are cut by hand from a green CI run (see [Publishing](#publishing)).
+
+This core was entirely AI-assisted with OpenCode and DeepSeek V4.1 Flash.
 
 ## Install
 
