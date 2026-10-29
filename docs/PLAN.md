@@ -8,7 +8,7 @@ Per-core reasoning for the UnrealSpeccyP port. Companion to
 Upstream pin: `0.0.86.30` (`cores/UnrealSpeccyP-0.0.86.30.tar.gz`,
 sha256 `8cc28f375c8cfb324fbe72f1f0d403d15f8c4b3c3622b008dcb8b0059fd79579`).
 
-## M0 — skeleton + headless native build (current)
+## M0 — skeleton + headless native build (DONE)
 
 Goal: upstream building headless with no frontend, no host devices, no
 window system. Two or three patches (build options) and a stub for whatever
@@ -179,8 +179,9 @@ The emulator through the musl guest toolchain, linked into `core.wbx`.
 > srcdir/builddir — minibox now builds in a WSL-native space-free mirror
 > (tools/wsl/mb-sync.sh; guest-link consumes MB_SRC_DIR/MB_BUILD_DIR, CI
 > keeps the checkout-defaults path); WSL wsl.exe -t WIPES /tmp, so the
-> session state file lives at /home/cloak (the retry -t was deleting its own
-> evidence); wsl_call preserves per-attempt logs for post-mortem.
+> session state file lives in GATE_SCRATCH on native ext4 (the retry -t was
+> deleting its own evidence); wsl_call preserves per-attempt logs for
+> post-mortem.
 
 Porting-doc mapping: item 4 (picture) was already done in M2 (ULA framebuffer read, parity holds); item 5 input is done here (audio pull was M1/M2); item 6 savestates done here (no StateLoaded needed — nothing derived lives in alloc_invisible). Item 3 (machine filesystem) needs no work for firmware boot: ROMs mount by name, no writable drives yet. Remaining: item 7 package + publishing checklist.
 
@@ -197,18 +198,38 @@ Porting-doc mapping: item 4 (picture) was already done in M2 (ULA framebuffer re
    in; currently no Mesa).
 8. Speed if needed: measure first.
 
-## Publishing (checklist, from porting doc)
+## Publishing (unofficial, by hand — decided 2026-10-28)
 
-1. Push `ToolAssisted-run/chimera-core-unrealspeccyp`, branch `main`.
-2. `chimera.yml`: gate the package on a public runner, upload artifact
-   `unrealspeccyp-${{ github.sha }}`. Gate content must be distributable
-   (machine-is-its-own-content? upstream test suite? else build +
-   sandbox-clean only, honestly claimed). Always run chimera's contract
-   tests with `CHIMERA_CORES_DIR` pointed at the package.
-3. `publish` job + daily `schedule:` calling
-   `ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main`.
-4. Row in chimera's `official-cores.json` + README core table
-   (`id "unrealspeccyp"`, systems `["ZXS"]`).
+Owner decision: the core is published as an **unofficial** repository,
+`ToolAssisted-run/chimera-core-unrealspeccyp`, branch `main`. No roster row,
+no `publish` job, no schedule. Chimera downloads nothing; a user takes the
+package from a release (README.md, "Install").
+
+CI (`.github/workflows/chimera.yml`) proves what a public runner can prove:
+the native reference and the sandbox agree, the real frontend (mono + Xvfb)
+boots content and resolves every declared button, and Chimera's contract
+tests open the package. The ROM/game matrix stays local: `ROMs/` and games
+are not distributable.
+
+A release is cut by hand:
+
+1. Green CI on the commit. Take that run's artifact; or build from a clean
+   clone (`build-package.sh` stamps `-dirty` when tracked files differ, and
+   `+local` without git — neither is publishable).
+2. Check the package: the `waterbox.config` inside stamps the commit, no
+   `-dirty`/`+local`; `core.wbx` and `licenses/` are in it.
+3. GitHub release: tag `dev` for the rolling build (pre-release; next time
+   delete the release and its tag and recreate) or `nightly-YYYY-MM-DD` for
+   an immutable dated one (Latest). Asset named
+   `unrealspeccyp-<sha>.chimeraCore`, never renamed. Notes: what changed,
+   what the user must bring, what was not proved.
+4. A nightly tag is never republished; a movie may name it.
+
+If it ever joins the official set: add the `publish` job and daily
+`schedule:` calling
+`ToolAssisted-run/chimera/.github/workflows/publish-core.yml@main`, then the
+roster row (`id "unrealspeccyp"`, systems `ZXS` and `ZXS48`, repo) and the
+README table row.
 
 ## M4 — the package (unofficial core)
 
@@ -458,3 +479,47 @@ end to end; the snapshot exercises xSnapshot::Load.
   before the fix they either stalled or misread the tape.
 - m6-tape-load-exact's golden moved to aa87... (the tape now starts at the
   Enter, not at open); fast and 48K goldens are unchanged.
+
+## Publishing prep (2026-10-28)
+
+Getting the tree ready for the first public push. The repository content was
+ready; the automation and the reader-facing half were not.
+
+- **The CI workflow had never run.** It could not have. Every `.sh` was
+  stored `100644` on a Windows checkout with `core.filemode=false`, so the
+  first `./waterbox/build-package.sh` on a runner was Permission denied.
+  The workflow also pointed the artifact at `chimera-core-unrealspeccyp/
+  dist/*.chimeraCore`, which does not exist in a CI checkout (the repo is the
+  workspace root).
+- **The gate was WSL-shaped.** `guest-legs.sh` staged the game, settings and
+  savestate in one WSL-native scratch path, which a runner cannot create; `run-gate.sh`
+  hardcoded the session path there; `run-frontend.sh` sourced `env.sh` whose
+  paths were one machine's; and the gate always ran the frontend leg while
+  the gate job installed no mono/Xvfb and built no Chimera UI.
+- Now: `env.sh` derives the core root from the caller (`CORE_ROOT` /
+  `CHIMERA_ROOT` override) and finds Chimera beside the core or inside the
+  CI workspace; `GATE_SCRATCH` carries the hand-off files (`/var/tmp/chimera-usp-gate`
+  under WSL, `build/guest/scratch` on Linux); `guest-legs.sh` builds the
+  miniBox host library if a fresh checkout lacks it; `build-native` and the
+  frontend suite check their prerequisites with a message instead of a
+  confusing failure.
+- CI installs the frontend's dependencies, builds miniBox with
+  `-Dguest_cpp=true`, builds Chimera's engine and interface, and runs the
+  whole gate; the contract job is unchanged. The header says the ROM/game
+  matrix stays local.
+- `build-package.sh` (and the frontend's test package) now stamp `-dirty`
+  when tracked files differ from the commit, `+local` without git. A release
+  can therefore not cite a version the tree does not match.
+- Reader-facing: README gained install, what-you-bring, buttons, settings,
+  status and publishing sections; `COPYING` carries the GPL-3.0 text and
+  `LICENSE.md` says what it covers — including that the ROM images at
+  `extern/upstream/res/rom/` are not part of the GPL grant and that the
+  package does not contain them.
+- Local-only probes (`fe-probe.sh`, `fe-smoke.sh`, the `usp-*.lua` scripts,
+  `chimera-engine.sh`, `fe-*.sh`) are gitignored: they name this machine's
+  paths, one names a copyrighted tape, and the gate does not use them.
+- Tested from a fresh clone at a space-free path, with Chimera beside it and
+  a fresh miniBox toolchain: `./waterbox/build-package.sh -r ../chimera`
+  green end to end (native, guest, m0-m6, frontend), stamped the commit
+  with no `-dirty`. The same build from a dirty tree stamps `-dirty`, as it
+  should.

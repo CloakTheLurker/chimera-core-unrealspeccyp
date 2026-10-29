@@ -37,6 +37,20 @@ HERE=$(dirname "$0")
 ROOT=$(cd "$HERE/.." && pwd -P)
 NATIVE="$ROOT/build/native/run-native"
 GUEST_WBX="$ROOT/build/guest/core.wbx"
+# The guest legs hand files between processes through a space-free scratch
+# path. Under WSL it must live on native ext4, because the gate kills
+# WSL between the two-process legs and `wsl -t` wipes /tmp. On a runner there
+# is no WSL and no /home/<user> to write: use the build tree.
+case "$(uname -s)" in
+  Linux)
+    GATE_SCRATCH=${GATE_SCRATCH:-$ROOT/build/guest/scratch}
+    mkdir -p "$GATE_SCRATCH"
+    ;;
+  *)
+    GATE_SCRATCH=${GATE_SCRATCH:-/var/tmp/chimera-usp-gate}
+    ;;
+esac
+export GATE_SCRATCH
 CONTENT=${USP_TEST_CONTENT:-}
 if [ -z "$CONTENT" ] && [ -f "$ROOT/test-content/boot.tap" ]; then
   CONTENT="$ROOT/test-content/boot.tap"
@@ -139,9 +153,6 @@ if [ -z "${MINIBOX_DIR:-}" ]; then
   if [ -d "$ROOT/../chimera/extern/chimera-common-minibox" ]; then
     MINIBOX_DIR="$ROOT/../chimera/extern/chimera-common-minibox"
     export MINIBOX_DIR
-  elif [ -d "$HOME/chimera/extern/chimera-common-minibox" ]; then
-    MINIBOX_DIR="$HOME/chimera/extern/chimera-common-minibox"
-    export MINIBOX_DIR
   fi
 fi
 echo "gate leg m2-build: build-guest.sh into $GUEST_WBX (MINIBOX_DIR=${MINIBOX_DIR:-(unset)})"
@@ -211,8 +222,8 @@ if [ "$(uname -s)" != "Linux" ]; then
   sleep 10
 fi
 echo "gate leg m3-session: save at frame 299 in one process, continue 300 in another"
-on_guest_host guest-legs.sh 300 $GGAME --save-at 299 --save-to /home/cloak/m3-session.state
-on_guest_host guest-legs.sh 300 $GGAME --continue-from /home/cloak/m3-session.state
+on_guest_host guest-legs.sh 300 $GGAME --save-at 299 --save-to "$GATE_SCRATCH/m3-session.state"
+on_guest_host guest-legs.sh 300 $GGAME --continue-from "$GATE_SCRATCH/m3-session.state"
 sed -n 's/^run-wbx /guest /p' "$WBXLOG" | tee /tmp/gate_wbx.log
 CT=$(field_of /tmp/gate_wbx.log guest tstates)
 CLV=$(field_of /tmp/gate_wbx.log guest lvhash)
@@ -222,7 +233,7 @@ echo "gate leg m3-session: continued tstates=$CT lvhash=$CLV lmhash=$CLM"
 [ "$GLV" = "$CLV" ] || { echo "gate leg m3-session: FAILED — last-frame video differs" >&2; exit 1; }
 [ "$GLM" = "$CLM" ] || { echo "gate leg m3-session: FAILED — last-frame audio differs" >&2; exit 1; }
 echo "gate leg m3-session: a savestate taken mid-run resumes the same machine"
-echo "gate leg m3-session: save file lives at /home/cloak/m3-session.state (native ext4: survives wsl -t, unlike /tmp)"
+echo "gate leg m3-session: save file lives at $GATE_SCRATCH/m3-session.state (space-free; on WSL native ext4 survives wsl -t, unlike /tmp)"
 
 echo "gate leg m4-settings-parity: guest with machine=48k agrees with native"
 printf '{"machine": "48k"}' > "$ROOT/build/guest/m48.json"

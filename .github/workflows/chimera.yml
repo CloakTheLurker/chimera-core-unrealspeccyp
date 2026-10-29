@@ -1,35 +1,96 @@
-# Unofficial core: gate + contract tests only. No publish job and no daily
-# schedule — an unofficial core is not in Chimera's official-cores.json and
-# publishes nowhere on its own. (Publishing is the owner's approval + roster
-# row + publish-core.yml call; see chimera/docs/new-core.md section 9.)
+# Unofficial core: build, gate and Chimera's contract tests only. No publish
+# job and no daily schedule — an unofficial core is not in Chimera's
+# official-cores.json and publishes nowhere on its own. A release is cut by
+# hand from a green run's artifact (see "Publishing" in README.md).
+#
+# What a runner proves here: the native reference and the sandbox agree, the
+# real frontend (mono + Xvfb) boots content and resolves every declared
+# button, and Chimera's contract tests open the package. The ROM/game matrix
+# stays local: ROMs/ and games are not distributable (docs/BUILDING.md).
 name: chimera-core-unrealspeccyp CI
+
 on:
   push:
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
 jobs:
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+
+      - name: Check out Chimera
+        uses: actions/checkout@v4
         with:
           repository: ToolAssisted-run/chimera
           path: chimera
           submodules: recursive
           fetch-depth: 1
-      - name: toolchain (guest link needs a C++ compiler, meson, ninja)
-        run: sudo apt-get update && sudo apt-get install -y g++ meson ninja-build python3
-      - name: gate the package
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential meson ninja-build python3 git cmake pkg-config \
+            perl flex bison mono-complete xvfb \
+            libgl1-mesa-dev libegl-dev libx11-dev libxext-dev libasound2-dev
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0'
+
+      - name: Build miniBox (sandbox and guest toolchain)
+        # The guest link asks this build for the musl + libstdc++ targets by
+        # name; building the tree first also gives the guest legs the host
+        # library they link run-wbx against.
+        run: |
+          mb="$PWD/chimera/extern/chimera-common-minibox"
+          [ -f "$mb/build/meson-linux/build.ninja" ] \
+            || meson setup "$mb/build/meson-linux" "$mb" -Dguest_cpp=true
+          meson compile -C "$mb/build/meson-linux"
+
+      - name: Build Chimera's engine
+        working-directory: chimera
+        run: |
+          meson setup build/meson-linux --prefix "$PWD/build" --libdir dll
+          meson compile -C build/meson-linux
+          meson install -C build/meson-linux
+
+      - name: Build Chimera's interface
+        working-directory: chimera
+        run: dotnet build source/gui/Chimera.sln -c Release /nodeReuse:false -p:UseSharedCompilation=false
+
+      - name: Gate the package
+        # Everything CI runs: native, guest, the whole gate (including the
+        # frontend) and the package. build-package.sh builds what it needs.
         run: ./waterbox/build-package.sh -r chimera
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v4
         with:
           name: unrealspeccyp-${{ github.sha }}
-          path: chimera-core-unrealspeccyp/dist/*.chimeraCore
+          path: dist/*.chimeraCore
+          if-no-files-found: error
+
+      - name: Upload the gate log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-log
+          path: build/guest/*.log
+          if-no-files-found: ignore
+
   contract:
     # Chimera's contract tests open the built package (no content needed).
     # Same shape as chimera's own "frontend against real packages" job:
     # mono hosts the net48 tests on Linux; libchimera reads the package.
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     needs: gate
     steps:
       - uses: actions/checkout@v4

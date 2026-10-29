@@ -38,7 +38,7 @@ else
     echo "build-guest: guest link needs Linux (or WSL with Ubuntu); neither found" >&2
     exit 1
   fi
-  # msys /home/admin/X == C:\Users\admin\X == WSL /mnt/c/Users/admin/X.
+  # A Windows path becomes a WSL path: /mnt/c/... for C:\...
   WSLROOT=$(cd "$ROOT" && pwd -W | tr "\134" "/" | sed 's|^\([A-Za-z]\):|/mnt/\L\1|')
   . "$HERE/wsl-call.sh"
   wsl_call guest-build.sh "" "guest-link: .* done" "$OUT/guest-build.log" 1500

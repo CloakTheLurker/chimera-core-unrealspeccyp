@@ -29,8 +29,18 @@ export MINIBOX_DIR="$CHIMERA/extern/chimera-common-minibox"
 "$HERE/build-guest.sh"
 "$HERE/run-gate.sh"
 
-COMMIT=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)
-WHEN=$(git -C "$ROOT" log -1 --format=%cI 2>/dev/null || echo unknown)
+# The version is the commit the package was built from, and a tracked file
+# that differs from it makes that stamp a lie. Such a package is marked
+# -dirty (publish-core.sh refuses one); a tree with no git history at all is
+# "+local". CORE_VERSION overrides the commit for a runner, but the dirty
+# suffix still applies: one commit is one package only from a clean tree.
+COMMIT=${CORE_VERSION:-$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)}
+[ -n "$COMMIT" ] || COMMIT="+local"
+if [ -n "$(git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null || true)" ]; then
+  case "$COMMIT" in *-dirty) ;; *) COMMIT="$COMMIT-dirty" ;; esac
+fi
+WHEN=$(git -C "$ROOT" log -1 --format=%cI 2>/dev/null || true)
+[ -n "$WHEN" ] || WHEN="unknown"
 mkdir -p "$ROOT/dist"
 cp "$HERE/waterbox.config" "$ROOT/dist/waterbox.config"
 cp "$HERE/file_slots.json" "$ROOT/dist/file_slots.json"

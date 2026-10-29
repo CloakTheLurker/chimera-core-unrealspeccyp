@@ -30,19 +30,19 @@ set -eu
 HERE=$(dirname "$0")
 ROOT=$(cd "$HERE/../.." && pwd -P)
 
-. "$ROOT/tools/wsl/env.sh" 2>/dev/null || {
-  # Native Linux checkout (no WSL): derive the same names from the repo root.
-  WIN_DEV="$ROOT"
-  WIN_CHIMERA="$ROOT/chimera"
-  WIN_CORE="$ROOT/chimera-core-unrealspeccyp"
-  MB_NATIVE="$HOME/mb"
-  MB_SRC="$MB_NATIVE/minibox"
-  MB_BUILD="$MB_NATIVE/build"
-  MINIBOX="$WIN_CHIMERA/extern/chimera-common-minibox"
-}
-
+# Shared paths: repo root from the caller, Chimera beside it or inside the
+# CI workspace, MINIBOX from -r. No checkout path is written down.
+. "$ROOT/tools/wsl/env.sh"
 CORE="$WIN_CORE"
 CHIMERA="$WIN_CHIMERA"
+
+[ -f "$CHIMERA/build/Chimera.exe" ] || {
+  echo "fe: FAILED — $CHIMERA/build/Chimera.exe missing; build Chimera's engine and interface first (docs/BUILDING.md)" >&2
+  exit 1
+}
+command -v mono >/dev/null 2>&1 || { echo "fe: FAILED — mono is not installed" >&2; exit 1; }
+command -v Xvfb >/dev/null 2>&1 || { echo "fe: FAILED — Xvfb is not installed" >&2; exit 1; }
+
 W="$CORE/waterbox/tests/work"
 PKGDIR="$CORE/build/frontend-pkg"
 TAP="$CORE/test-content/boot.tap"
@@ -55,8 +55,11 @@ mkdir -p "$PKGDIR"
 cp "$CORE/waterbox/waterbox.config" "$CORE/waterbox/file_slots.json" \
    "$CORE/waterbox/default_keybinds.json" "$PKGDIR/"
 cp "$CORE/build/guest/core.wbx" "$PKGDIR/"
-COMMIT=$(git -C "$CORE" rev-parse HEAD 2>/dev/null || echo unknown)
-WHEN=$(git -C "$CORE" log -1 --format=%cI 2>/dev/null || echo unknown)
+COMMIT=${CORE_VERSION:-$(git -C "$CORE" rev-parse HEAD 2>/dev/null || true)}
+[ -n "$COMMIT" ] || COMMIT="+local"
+[ -z "$(git -C "$CORE" status --porcelain --untracked-files=no 2>/dev/null || true)" ] || COMMIT="$COMMIT-dirty"
+WHEN=$(git -C "$CORE" log -1 --format=%cI 2>/dev/null || true)
+[ -n "$WHEN" ] || WHEN="unknown"
 python3 - "$PKGDIR/waterbox.config" "$COMMIT" "$WHEN" <<'PY'
 import json, sys
 path, commit, when = sys.argv[1], sys.argv[2], sys.argv[3]

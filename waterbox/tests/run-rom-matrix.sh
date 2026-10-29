@@ -24,11 +24,18 @@ if [ -z "${MINIBOX_DIR:-}" ]; then
   if [ -d "$ROOT/../chimera/extern/chimera-common-minibox" ]; then
     MINIBOX_DIR="$ROOT/../chimera/extern/chimera-common-minibox"
     export MINIBOX_DIR
-  elif [ -d "$HOME/chimera/extern/chimera-common-minibox" ]; then
-    MINIBOX_DIR="$HOME/chimera/extern/chimera-common-minibox"
-    export MINIBOX_DIR
   fi
 fi
+case "$(uname -s)" in
+  Linux)
+    GATE_SCRATCH=${GATE_SCRATCH:-$ROOT/build/guest/scratch}
+    mkdir -p "$GATE_SCRATCH"
+    ;;
+  *)
+    GATE_SCRATCH=${GATE_SCRATCH:-/var/tmp/chimera-usp-gate}
+    ;;
+esac
+export GATE_SCRATCH
 on_guest_host() {
   if [ "$(uname -s)" = "Linux" ]; then
     mkdir -p "$GUEST_DIR"

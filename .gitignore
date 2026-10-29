@@ -8,3 +8,16 @@ core.wbx
 .DS_Store
 waterbox/tests/work/
 ROMs/
+
+# Local-only probes, never part of the published tree (they name this
+# machine's paths and a copyrighted game). The gate does not use them.
+tools/wsl/chimera-engine.sh
+tools/wsl/fe-boot.sh
+tools/wsl/fe-bootstrap.sh
+tools/wsl/fe-mmload.sh
+tools/wsl/fe-run.sh
+waterbox/tests/bootstrap-exit.lua
+waterbox/tests/fe-probe.sh
+waterbox/tests/fe-smoke.sh
+waterbox/tests/usp-boot.lua
+waterbox/tests/usp-mmload.lua
