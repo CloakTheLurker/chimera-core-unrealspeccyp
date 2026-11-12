@@ -12,9 +12,10 @@ a green CI run's artifact (README.md, "Publishing").
 - `waterbox/` — adapter + builds + gate: `machine.{h,cpp}`, `wbx-entry.cpp`
   (guest ABI), `run-native.cpp`, `run-wbx.c`, `usp_time.h`, `palette.h`,
   `build-{native,guest,package}.sh`, `run-gate.sh`, `check-wbx.sh`,
-  `guest-link.sh`, `guest-syscalls.cpp`, and the four declarations
+  `guest-link.sh`, `guest-syscalls.cpp`, the four declarations
   (`waterbox.config`, `file_slots.json`, `default_keybinds.json`,
-  `package-licenses.json`).
+  `package-licenses.json`), and `languages/` - one table per Chimera
+  language; every text field in the declarations is a key of them.
 - `waterbox/tests/` — the window test (`run-frontend.sh`, legacy .NET and not
   run), its Lua scripts, the distributable test content's generators, and the
   local-only ROM matrix.
@@ -46,6 +47,9 @@ and is not run; CI runs Chimera's contract test instead.
 - The engine contract is law: `FrameAdvance(uint64_t)` (button i = bit i
   of `input.buttons`), optional `SetButton(int,int)`. Check
   `chimera/source/engine/` before inventing.
+- The package declares where it runs (`runsOn`) and carries a table for every
+  language Chimera has. The text fields (`display`, `description`, slot
+  `title`/`help`) are keys, never the words themselves.
 - Button order in `waterbox.config` is the movie contract: NEVER reorder.
   There are 62 (four presets × 5, Space/Enter, the 40-key Spectrum keyboard).
 - Input is levels, not events, applied whole every frame in both flavors.

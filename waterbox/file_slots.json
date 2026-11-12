@@ -2,11 +2,19 @@
   "slots": [
     {
       "id": "game",
-      "title": "Spectrum software",
-      "help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those.",
+      "title": "slot.game.title",
+      "help": "slot.game.help",
       "min": 0,
       "max": 1,
-      "formats": ["tap", "tzx", "csw", "sna", "z80", "szx", "zip"]
+      "formats": [
+        "tap",
+        "tzx",
+        "csw",
+        "sna",
+        "z80",
+        "szx",
+        "zip"
+      ]
     }
   ]
 }

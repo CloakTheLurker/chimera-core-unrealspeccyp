@@ -17,7 +17,7 @@ cd chimera-core-unrealspeccyp
 
 That builds the native reference, links `core.wbx` through the musl guest
 toolchain, runs the core gate, stamps version/versionDate from the commit,
-lays out `dist/licenses/`, and zips
+lays out `dist/licenses/` and `dist/languages/`, and zips
 `dist/unrealspeccyp-<sha>.chimeraCore`.
 
 The package is stamped with the commit it was built from. A tree with tracked

@@ -81,9 +81,11 @@ Shift keys send `Shift`, so Caps Shift and Symbol Shift both answer it
 ## Status
 
 The gate is green end to end, and Chimera's contract tests pass against the
-built package. Tried with Manic Miner, Driar and EXO-TICAL: picture, stereo
-sound, tapes, keys, joysticks, snapshots and savestates work, and the
-sandboxed core gives the same results as the plain native build.
+built package. The package declares `runsOn` for `windows-x86_64` and
+`linux-x86_64`, and carries a language table for every language Chimera has.
+Tried with Manic Miner, Driar and EXO-TICAL: picture, stereo sound, tapes,
+keys, joysticks, snapshots and savestates work, and the sandboxed core gives
+the same results as the plain native build.
 
 Not there yet:
 
@@ -91,6 +93,7 @@ Not there yet:
   cannot be opened);
 - no per-game settings (the in-game key presets are picked by hand);
 - one content file per project;
+- the 25 non-English language tables hold the English text for now;
 - No Kempston mouse or other add-on interfaces;
 - the window test (`waterbox/tests/run-frontend.sh`) still drives the old
   .NET frontend and is not run until it is ported to the Qt window. CI runs
@@ -121,7 +124,9 @@ decision and its measurement — is [docs/PLAN.md](docs/PLAN.md).
 Unofficial: there is no publish job and no schedule. To cut a release, take
 the artifact from a green CI run (or a package built from a clean checkout at
 the commit), check that the `waterbox.config` inside stamps that commit and
-no `-dirty`, and create a GitHub release by hand:
+no `-dirty`, and create a GitHub release by hand. The package names
+`windows-x86_64` and `linux-x86_64` in `runsOn`; Chimera refuses it on any
+other system:
 
 - tag `dev` for the rolling build (pre-release, replaced next time by
   deleting the release and its tag), or `nightly-YYYY-MM-DD` for an immutable
@@ -143,7 +148,7 @@ one with no git history stamps `+local`; neither is publishable.
 - **M3 — input levels + savestates (DONE 2026-10-26).** Rerecord and
   two-process session legs green.
 - **M4 — the package (DONE 2026-10-27).** The engine ABI, buttons, settings,
-  firmware, keybinds and licences; Chimera's contract tests 26/26.
+  firmware, keybinds and licences; Chimera's contract tests passed.
 - **M5 — content loading + frontend gate (DONE 2026-10-27).** Distributable
   test content, tapes and snapshots; the real frontend of the time (the .NET
   window) booted it headless. The window test has not been ported to the Qt

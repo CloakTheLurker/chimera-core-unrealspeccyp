@@ -5,7 +5,7 @@
 # Builds native + guest, runs the gate, stamps version/versionDate into the
 # packaged waterbox.config (the commit, and the date of that commit in UTC —
 # never the build date, which would make one commit two packages), lays out
-# licenses/, and zips dist/unrealspeccyp-<version>.chimeraCore.
+# licenses/ and languages/, and zips dist/unrealspeccyp-<version>.chimeraCore.
 # A dependency this script does not build does not exist on a runner.
 # The bundle sends each core's stdout to /dev/null, so reproduce silent
 # failures with:
@@ -45,6 +45,8 @@ mkdir -p "$ROOT/dist"
 cp "$HERE/waterbox.config" "$ROOT/dist/waterbox.config"
 cp "$HERE/file_slots.json" "$ROOT/dist/file_slots.json"
 cp "$HERE/default_keybinds.json" "$ROOT/dist/default_keybinds.json"
+rm -rf "$ROOT/dist/languages"
+cp -r "$HERE/languages" "$ROOT/dist/languages"
 cp "$ROOT/build/guest/core.wbx" "$ROOT/dist/core.wbx"
 python3 - "$ROOT/dist/waterbox.config" "$COMMIT" "$WHEN" <<'PY'
 import json, sys
@@ -64,9 +66,10 @@ import json, sys, zipfile
 commit = sys.argv[1]
 files = ["waterbox.config", "core.wbx", "file_slots.json", "default_keybinds.json"]
 import os
-for dirpath, _dirs, names in os.walk("licenses"):
-    for n in names:
-        files.append(os.path.join(dirpath, n))
+for folder in ("licenses", "languages"):
+    for dirpath, _dirs, names in os.walk(folder):
+        for n in names:
+            files.append(os.path.join(dirpath, n))
 name = f"unrealspeccyp-{commit}.chimeraCore"
 with zipfile.ZipFile(name, "w", zipfile.ZIP_DEFLATED) as z:
     for f in files:
