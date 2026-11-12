@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Kone",
+    "setting.machine.description": "Mikä tietokone tämä on: 128K Pentagon (128 BASIC, TR-DOS, AY-ääni) vai 48K Spectrum (48 BASIC). Snapshot-tiedosto kertoo, millä koneella se on otettu, ja sitä konetta käytetään riippumatta tässä tehdystä valinnasta. Valinta tallennetaan projektiin, joten elokuvat toistuvat samalla koneella.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Nopea nauhanlataus",
+    "setting.fast_tape.description": "Kaappaa ROMin nauhalataajan (dec/djnz-viivesilmukat ja reunan odotukset) sen sijaan että suorittaisi sen nauhan pyöriessä. Upstreamin oletus; pois päältä lataus on syklintarkka. Muokkaa konetta, joten se on synkronointiasetus.",
+    "setting.sound_chip.display": "Äänipiiri",
+    "setting.sound_chip.description": "AY-3-8910 tai sen nastayhteensopiva seuraaja Yamaha YM2149F (erilaiset äänenvoimakkuustaulukot). Muokkaa konetta, joten se on synkronointiasetus.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "Pentagon 128K BASIC-ROM (sivu 0). Kone ei käynnisty ilman sitä.",
+    "firmware.sos128_1.description": "Pentagon 128K -editori/valikko-ROM (sivu 1). Kone ei käynnisty ilman sitä.",
+    "firmware.sos48.description": "48K BASIC-ROM, jonka 48K-kone valitsee käynnistyksessä (ladataan aina; kone sulkeutuu, jos jokin viidestä puuttuu).",
+    "firmware.service.description": "Huolto/testi-ROM, joka valitaan käynnistyksessä, kun 48K-tila ei ole käytössä. Kone ei käynnisty ilman sitä.",
+    "firmware.dos513f.description": "TR-DOS-ROM Beta Disk -liitännälle. Tarvitaan levykuville.",
+    "slot.game.title": "Spectrum-ohjelmisto",
+    "slot.game.help": "Käynnistettävä nauha tai snapshot: TAP/TZX/CSW-nauhat ja SNA/Z80/SZX-snapshotit tai ZIP, joka sisältää jonkin niistä."
   }
 }

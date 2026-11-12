@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Mașină",
+    "setting.machine.description": "Ce calculator este: Pentagon 128K (128 BASIC, TR-DOS, sunet AY) sau Spectrum 48K (48 BASIC). Un fișier snapshot spune pe ce mașină a fost făcut, iar acea mașină este folosită indiferent de opțiunea aleasă aici. Alegerea este salvată în proiect, astfel încât filmele să fie redate pe aceeași mașină.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Încărcare rapidă a benzii",
+    "setting.fast_tape.description": "Interceptează încărcătorul de bandă din ROM (bucle de întârziere dec/djnz și așteptări de front) în loc să îl execute cât timp rulează o bandă. Valoarea implicită a upstream-ului; dezactivat, încărcarea este exactă la ciclu. Modelează mașina, deci este o setare de sincronizare.",
+    "setting.sound_chip.display": "Cip de sunet",
+    "setting.sound_chip.description": "AY-3-8910 sau succesorul său compatibil la nivel de pini Yamaha YM2149F (tabele de volum diferite). Modelează mașina, deci este o setare de sincronizare.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "ROM BASIC pentru Pentagon 128K (pagina 0). Mașina nu pornește fără ea.",
+    "firmware.sos128_1.description": "ROM editor/meniu pentru Pentagon 128K (pagina 1). Mașina nu pornește fără ea.",
+    "firmware.sos48.description": "ROM BASIC 48K, selectat la pornire de mașina 48K (se încarcă întotdeauna; mașina se oprește dacă lipsește oricare dintre cele cinci).",
+    "firmware.service.description": "ROM de service/test, selectat la pornire când nu este modul 48K. Mașina nu pornește fără ea.",
+    "firmware.dos513f.description": "ROM TR-DOS pentru interfața Beta Disk. Necesar pentru imagini de disc.",
+    "slot.game.title": "Software pentru Spectrum",
+    "slot.game.help": "Banda sau snapshotul de pornit: benzi TAP/TZX/CSW și snapshoturi SNA/Z80/SZX, sau un ZIP care conține unul dintre ele."
   }
 }

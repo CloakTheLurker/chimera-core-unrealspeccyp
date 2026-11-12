@@ -93,7 +93,8 @@ Not there yet:
   cannot be opened);
 - no per-game settings (the in-game key presets are picked by hand);
 - one content file per project;
-- the 25 non-English language tables hold the English text for now;
+- the non-English translations are AI-made and have not been reviewed by
+  native speakers;
 - No Kempston mouse or other add-on interfaces;
 - the window test (`waterbox/tests/run-frontend.sh`) still drives the old
   .NET frontend and is not run until it is ported to the Qt window. CI runs

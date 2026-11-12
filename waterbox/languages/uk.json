@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Машина",
+    "setting.machine.description": "Який це комп'ютер: 128K Pentagon (128 BASIC, TR-DOS, звук AY) чи 48K Spectrum (48 BASIC). Файл знімка вказує, на якій машині його зроблено, і використовується ця машина незалежно від вибраного тут варіанта. Вибір зберігається в проєкті, тож фільми відтворюються на тій самій машині.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Швидке завантаження зі стрічки",
+    "setting.fast_tape.description": "Перехоплює стрічковий завантажувач із ROM (цикли затримки dec/djnz і очікування фронтів) замість його виконання, поки йде стрічка. Типове значення upstream; якщо вимкнено, завантаження точне до такту. Впливає на машину, тому це параметр синхронізації.",
+    "setting.sound_chip.display": "Звуковий чип",
+    "setting.sound_chip.description": "AY-3-8910 або його вивідково-сумісний наступник Yamaha YM2149F (інші таблиці гучності). Впливає на машину, тому це параметр синхронізації.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "ROM BASIC для Pentagon 128K (сторінка 0). Без неї машина не завантажується.",
+    "firmware.sos128_1.description": "ROM редактора/меню для Pentagon 128K (сторінка 1). Без неї машина не завантажується.",
+    "firmware.sos48.description": "ROM BASIC 48K, яку під час запуску вибирає машина 48K (завантажується завжди; машина завершує роботу, якщо бракує будь-якої з п'яти).",
+    "firmware.service.description": "Сервісна/тестова ROM, яку вибирають під час запуску, коли не використовується режим 48K. Без неї машина не завантажується.",
+    "firmware.dos513f.description": "ROM TR-DOS для інтерфейсу Beta Disk. Потрібна для образів дисків.",
+    "slot.game.title": "Програмне забезпечення для Spectrum",
+    "slot.game.help": "Стрічка або знімок для запуску: стрічки TAP/TZX/CSW і знімки SNA/Z80/SZX або ZIP, що містить один із них."
   }
 }

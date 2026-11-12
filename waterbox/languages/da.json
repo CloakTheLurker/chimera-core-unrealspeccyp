@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Maskine",
+    "setting.machine.description": "Hvilken computer det er: 128K Pentagon (128 BASIC, TR-DOS, AY-lyd) eller 48K Spectrum (48 BASIC). En snapshotfil angiver, hvilken maskine den blev taget på, og den maskine bruges, uanset hvad der vælges her. Valget gemmes i projektet, så film afspilles på samme maskine.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Hurtig båndindlæsning",
+    "setting.fast_tape.description": "Fanger ROM'ens båndindlæser (dec/djnz-forsinkelsesløkker og kantventetider) i stedet for at køre den, mens et bånd kører. Standard i upstream; slået fra er cykluspræcis indlæsning. Påvirker maskinen, så det er en synkroniseringsindstilling.",
+    "setting.sound_chip.display": "Lydchip",
+    "setting.sound_chip.description": "AY-3-8910 eller dens pinkompatible efterfølger Yamaha YM2149F (forskellige lydstyrketabeller). Påvirker maskinen, så det er en synkroniseringsindstilling.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "Pentagon 128K BASIC-ROM (side 0). Maskinen starter ikke uden den.",
+    "firmware.sos128_1.description": "Pentagon 128K editor/menu-ROM (side 1). Maskinen starter ikke uden den.",
+    "firmware.sos48.description": "48K BASIC-ROM, som 48K-maskinen vælger ved opstart (indlæses altid; maskinen afslutter, hvis en af de fem mangler).",
+    "firmware.service.description": "Service/test-ROM, valgt ved opstart når der ikke er 48K-tilstand. Maskinen starter ikke uden den.",
+    "firmware.dos513f.description": "TR-DOS-ROM til Beta Disk-interfacet. Nødvendig for diskbilleder.",
+    "slot.game.title": "Software til Spectrum",
+    "slot.game.help": "Båndet eller snapshotet, der skal startes: TAP/TZX/CSW-bånd og SNA/Z80/SZX-snapshots, eller en ZIP, der indeholder et af dem."
   }
 }

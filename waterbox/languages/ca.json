@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Màquina",
+    "setting.machine.description": "Quin ordinador és: el Pentagon de 128K (BASIC de 128K, TR-DOS, so AY) o l'Spectrum de 48K (BASIC de 48K). Un fitxer de snapshot indica en quina màquina es va fer, i s'utilitza aquesta màquina sigui quina sigui l'opció triada aquí. L'elecció es desa al projecte, de manera que les pel·lícules es reprodueixen a la mateixa màquina.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Càrrega ràpida de cinta",
+    "setting.fast_tape.description": "Intercepta el carregador de cinta de la ROM (bucles de retard dec/djnz i esperes de flanc) en lloc d'executar-lo mentre hi ha una cinta en marxa. És el valor per defecte de l'emulador original; desactivat, la càrrega és exacta al cicle. Dona forma a la màquina, així que és un paràmetre de sincronització.",
+    "setting.sound_chip.display": "Xip de so",
+    "setting.sound_chip.description": "AY-3-8910 o el seu successor compatible amb els pins Yamaha YM2149F (taules de volum diferents). Dona forma a la màquina, així que és un paràmetre de sincronització.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "ROM BASIC del Pentagon de 128K (pàgina 0). La màquina no arrenca sense aquesta.",
+    "firmware.sos128_1.description": "ROM d'editor/menú del Pentagon de 128K (pàgina 1). La màquina no arrenca sense aquesta.",
+    "firmware.sos48.description": "ROM BASIC de 48K, seleccionada en arrencar per la màquina de 48K (es carrega sempre; la màquina surt si en falta qualsevol de les cinc).",
+    "firmware.service.description": "ROM de servei/prova, seleccionada en arrencar quan no s'usa el mode de 48K. La màquina no arrenca sense aquesta.",
+    "firmware.dos513f.description": "ROM TR-DOS per a la interfície Beta Disk. Cal per a les imatges de disc.",
+    "slot.game.title": "Programari per a Spectrum",
+    "slot.game.help": "La cinta o el snapshot per arrencar: cintes TAP/TZX/CSW i snapshots SNA/Z80/SZX, o un ZIP que contingui un d'aquests."
   }
 }

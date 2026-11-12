@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Rechner",
+    "setting.machine.description": "Welcher Computer dies ist: der 128K Pentagon (128 BASIC, TR-DOS, AY-Sound) oder der 48K Spectrum (48 BASIC). Eine Snapshot-Datei sagt, auf welchem Rechner sie aufgenommen wurde, und dieser Rechner wird verwendet, unabhängig von der hier getroffenen Wahl. Die Wahl wird im Projekt gespeichert, damit Filme auf demselben Rechner abgespielt werden.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Schnelles Bandladen",
+    "setting.fast_tape.description": "Fängt den ROM-Bandlader ab (dec/djnz-Verzögerungsschleifen und Flankenwartezeiten), statt ihn auszuführen, während ein Band läuft. Standard des Upstream; ausgeschaltet bedeutet zyklusgenaues Laden. Prägt den Rechner, ist also eine Synchronisationseinstellung.",
+    "setting.sound_chip.display": "Soundchip",
+    "setting.sound_chip.description": "AY-3-8910 oder sein pin-kompatibler Nachfolger Yamaha YM2149F (andere Lautstärketabellen). Prägt den Rechner, ist also eine Synchronisationseinstellung.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "Pentagon 128K BASIC-ROM (Seite 0). Ohne sie startet der Rechner nicht.",
+    "firmware.sos128_1.description": "Pentagon 128K Editor-/Menü-ROM (Seite 1). Ohne sie startet der Rechner nicht.",
+    "firmware.sos48.description": "48K BASIC-ROM, beim Start vom 48K-Rechner gewählt (wird immer geladen; fehlt eine der fünf, beendet sich der Rechner).",
+    "firmware.service.description": "Service-/Test-ROM, beim Start gewählt, wenn kein 48K-Modus aktiv ist. Ohne sie startet der Rechner nicht.",
+    "firmware.dos513f.description": "TR-DOS-ROM für die Beta-Disk-Schnittstelle. Wird für Disk-Images benötigt.",
+    "slot.game.title": "Software für den Spectrum",
+    "slot.game.help": "Das Band oder den Snapshot zum Starten: TAP/TZX/CSW-Bänder und SNA/Z80/SZX-Snapshots oder eine ZIP-Datei, die eines davon enthält."
   }
 }

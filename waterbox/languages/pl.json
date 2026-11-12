@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "Maszyna",
+    "setting.machine.description": "Który to komputer: 128K Pentagon (128 BASIC, TR-DOS, dźwięk AY) czy 48K Spectrum (48 BASIC). Plik snapshotu mówi, na której maszynie go wykonano, i ta maszyna jest używana niezależnie od wyboru tutaj. Wybór jest zapisywany w projekcie, więc filmy odtwarzają się na tej samej maszynie.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "Szybkie wczytywanie taśmy",
+    "setting.fast_tape.description": "Przechwytuje loader taśmy z ROM-u (pętle opóźnień dec/djnz i oczekiwanie na zbocza) zamiast go wykonywać, gdy taśma jest uruchomiona. Domyślne ustawienie upstreamu; wyłączone oznacza wczytywanie dokładne co do cyklu. Kształtuje maszynę, więc jest to ustawienie synchronizacji.",
+    "setting.sound_chip.display": "Chip dźwięku",
+    "setting.sound_chip.description": "AY-3-8910 lub jego zgodny pinowo następca Yamaha YM2149F (inne tabele głośności). Kształtuje maszynę, więc jest to ustawienie synchronizacji.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "ROM BASIC komputera Pentagon 128K (strona 0). Bez niego maszyna nie uruchomi się.",
+    "firmware.sos128_1.description": "ROM edytora/menu komputera Pentagon 128K (strona 1). Bez niego maszyna nie uruchomi się.",
+    "firmware.sos48.description": "ROM BASIC 48K, wybierany przy starcie przez maszynę 48K (zawsze wczytywany; maszyna kończy działanie, jeśli brakuje któregokolwiek z pięciu).",
+    "firmware.service.description": "ROM serwisowy/testowy, wybierany przy starcie, gdy nie jest aktywny tryb 48K. Bez niego maszyna nie uruchomi się.",
+    "firmware.dos513f.description": "ROM TR-DOS dla interfejsu Beta Disk. Potrzebny do obrazów dysków.",
+    "slot.game.title": "Oprogramowanie dla Spectrum",
+    "slot.game.help": "Taśma lub snapshot do uruchomienia: taśmy TAP/TZX/CSW i snapshoty SNA/Z80/SZX albo ZIP zawierający któryś z nich."
   }
 }

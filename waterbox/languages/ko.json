@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "머신",
+    "setting.machine.description": "어떤 컴퓨터인지: 128K Pentagon(128 BASIC, TR-DOS, AY 사운드) 또는 48K Spectrum(48 BASIC). 스냅샷 파일은 어느 머신에서 만들었는지 알려 주며, 여기서 선택한 값과 관계없이 그 머신이 사용됩니다. 선택은 프로젝트에 저장되므로 영화는 같은 머신에서 재생됩니다.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "빠른 테이프 로딩",
+    "setting.fast_tape.description": "테이프가 실행되는 동안 ROM 테이프 로더(dec/djnz 지연 루프와 에지 대기)를 실행하지 않고 가로챕니다. 업스트림 기본값이며, 끄면 사이클 단위로 정확하게 로드합니다. 머신의 특성을 바꾸므로 동기화 설정입니다.",
+    "setting.sound_chip.display": "사운드 칩",
+    "setting.sound_chip.description": "AY-3-8910 또는 핀 호환 후속 모델 Yamaha YM2149F(볼륨 테이블이 다름). 머신의 특성을 바꾸므로 동기화 설정입니다.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM(페이지 0). 이 ROM이 없으면 머신이 부팅하지 않습니다.",
+    "firmware.sos128_1.description": "Pentagon 128K 편집기/메뉴 ROM(페이지 1). 이 ROM이 없으면 머신이 부팅하지 않습니다.",
+    "firmware.sos48.description": "48K BASIC ROM. 48K 머신이 부팅할 때 선택합니다(항상 로드되며, 다섯 개 중 하나라도 없으면 머신이 종료됩니다).",
+    "firmware.service.description": "서비스/테스트 ROM. 48K 모드가 아닐 때 부팅 시 선택됩니다. 이 ROM이 없으면 머신이 부팅하지 않습니다.",
+    "firmware.dos513f.description": "Beta Disk 인터페이스용 TR-DOS ROM. 디스크 이미지에 필요합니다.",
+    "slot.game.title": "Spectrum 소프트웨어",
+    "slot.game.help": "부팅할 테이프 또는 스냅샷: TAP/TZX/CSW 테이프와 SNA/Z80/SZX 스냅샷, 또는 그중 하나를 담은 ZIP."
   }
 }

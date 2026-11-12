@@ -1,21 +1,21 @@
 {
   "texts": {
-    "setting.machine.display": "Machine",
-    "setting.machine.description": "Which computer this is: the 128K Pentagon (128 BASIC, TR-DOS, AY sound) or the 48K Spectrum (48 BASIC). A snapshot file says which machine it was taken on, and that machine is used whatever is chosen here. The choice is recorded in the project, so movies replay on the same machine.",
+    "setting.machine.display": "机器",
+    "setting.machine.description": "这是哪台计算机：128K Pentagon（128 BASIC、TR-DOS、AY 声音）或 48K Spectrum（48 BASIC）。快照文件会说明它是在哪台机器上拍摄的，无论此处选择什么，都会使用该机器。选择会记录在项目中，因此影片会在同一台机器上重放。",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
-    "setting.fast_tape.display": "Fast tape loading",
-    "setting.fast_tape.description": "Trap the ROM tape loader (dec/djnz delay loops and edge waits) instead of executing it, while a tape runs. Upstream default; off is cycle-exact loading. Shapes the machine, so it is a sync setting.",
-    "setting.sound_chip.display": "Sound chip",
-    "setting.sound_chip.description": "AY-3-8910 or its Yamaha YM2149F pin-compatible follow-up (different volume tables). Shapes the machine, so it is a sync setting.",
+    "setting.fast_tape.display": "快速磁带加载",
+    "setting.fast_tape.description": "在磁带运行时拦截 ROM 磁带加载程序（dec/djnz 延迟循环和边沿等待），而不是执行它。上游默认值；关闭后为周期精确加载。它会塑造机器，因此是一项同步设置。",
+    "setting.sound_chip.display": "声音芯片",
+    "setting.sound_chip.description": "AY-3-8910 或其引脚兼容的后续型号 Yamaha YM2149F（音量表不同）。它会塑造机器，因此是一项同步设置。",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
-    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM (page 0). The machine does not boot without it.",
-    "firmware.sos128_1.description": "Pentagon 128K editor/menu ROM (page 1). The machine does not boot without it.",
-    "firmware.sos48.description": "48K BASIC ROM, selected at boot by the 48K machine (always loaded; the machine exits without any of the five).",
-    "firmware.service.description": "Service/test ROM, selected at boot when not in 48K mode. The machine does not boot without it.",
-    "firmware.dos513f.description": "TR-DOS ROM for the Beta Disk interface. Needed for disk images.",
-    "slot.game.title": "Spectrum software",
-    "slot.game.help": "The tape or snapshot to boot: TAP/TZX/CSW tapes and SNA/Z80/SZX snapshots, or a ZIP holding one of those."
+    "firmware.sos128_0.description": "Pentagon 128K BASIC ROM（第 0 页）。没有它机器无法启动。",
+    "firmware.sos128_1.description": "Pentagon 128K 编辑器/菜单 ROM（第 1 页）。没有它机器无法启动。",
+    "firmware.sos48.description": "48K BASIC ROM，由 48K 机器在启动时选择（始终加载；五者中缺少任何一个，机器都会退出）。",
+    "firmware.service.description": "服务/测试 ROM，在非 48K 模式启动时选择。没有它机器无法启动。",
+    "firmware.dos513f.description": "用于 Beta Disk 接口的 TR-DOS ROM。磁盘映像需要它。",
+    "slot.game.title": "Spectrum 软件",
+    "slot.game.help": "要启动的磁带或快照：TAP/TZX/CSW 磁带和 SNA/Z80/SZX 快照，或包含其中之一的 ZIP。"
   }
 }
