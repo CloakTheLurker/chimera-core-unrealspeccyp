@@ -1,13 +1,13 @@
 {
   "texts": {
     "setting.machine.display": "Machine",
-    "setting.machine.description": "De quel ordinateur il s'agit : le Pentagon 128K (BASIC 128K, TR-DOS, son AY) ou le Spectrum 48K (BASIC 48K). Un fichier d'instantané indique sur quelle machine il a été pris, et cette machine est utilisée quel que soit le choix fait ici. Le choix est enregistré dans le projet, afin que les films se rejouent sur la même machine.",
+    "setting.machine.description": "De quel ordinateur il s'agit : le Pentagon 128K (128 BASIC, TR-DOS, audio AY) ou le Spectrum 48K (48 BASIC). Un fichier d'instantané indique sur quelle machine il a été pris, et cette machine est utilisée quel que soit le choix fait ici. Le choix est enregistré dans le projet, afin que les fichiers films rejouent sur la même machine.",
     "setting.machine.option.128k": "ZX Spectrum 128K",
     "setting.machine.option.48k": "ZX Spectrum 48K",
     "setting.fast_tape.display": "Chargement rapide de cassette",
     "setting.fast_tape.description": "Intercepte le chargeur de cassette de la ROM (boucles d'attente dec/djnz et attentes de front) au lieu de l'exécuter pendant qu'une cassette tourne. Comportement par défaut de l'émulateur d'origine ; désactivé, le chargement est exact au cycle. Façonne la machine, c'est donc un réglage de synchronisation.",
     "setting.sound_chip.display": "Puce sonore",
-    "setting.sound_chip.description": "AY-3-8910 ou son successeur compatible broche Yamaha YM2149F (tables de volume différentes). Façonne la machine, c'est donc un réglage de synchronisation.",
+    "setting.sound_chip.description": "AY-3-8910 ou son successeur compatible broche à broche Yamaha YM2149F (tables de volume différentes). Façonne la machine, c'est donc un réglage de synchronisation.",
     "setting.sound_chip.option.ay": "AY-3-8910",
     "setting.sound_chip.option.ym": "YM2149F",
     "firmware.sos128_0.description": "ROM BASIC du Pentagon 128K (page 0). La machine ne démarre pas sans elle.",

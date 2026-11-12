@@ -530,9 +530,10 @@ Chimera's package contract now requires `runsOn` and a language table for
 every language it has. Added `runsOn: ["windows-x86_64", "linux-x86_64"]`
 (the systems this core is built and tried on; not macOS or aarch64), and
 converted every declaration text to a key in `waterbox/languages/`: 17 keys
-and 26 tables. The 25 non-English tables are translated; like the rest of the
-core, the translations are AI-assisted and have not been reviewed by native
-speakers. `build-package.sh` now ships the tables.
+and 26 tables. The 25 non-English tables are translated; the French one was
+reviewed and verified by CloakTheLurker, while the other 24 are AI-assisted
+and have not been reviewed by native speakers. `build-package.sh` now ships
+the tables.
 
 Tested: `tools/check-core-texts.py` reports 17 keys, every one named and every
 name a key; `test-packages` on the assembled package passes every check. The

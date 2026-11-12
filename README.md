@@ -83,6 +83,7 @@ Shift keys send `Shift`, so Caps Shift and Symbol Shift both answer it
 The gate is green end to end, and Chimera's contract tests pass against the
 built package. The package declares `runsOn` for `windows-x86_64` and
 `linux-x86_64`, and carries a language table for every language Chimera has.
+The French translation was reviewed and verified by CloakTheLurker.
 Tried with Manic Miner, Driar and EXO-TICAL: picture, stereo sound, tapes,
 keys, joysticks, snapshots and savestates work, and the sandboxed core gives
 the same results as the plain native build.
@@ -93,8 +94,8 @@ Not there yet:
   cannot be opened);
 - no per-game settings (the in-game key presets are picked by hand);
 - one content file per project;
-- the non-English translations are AI-made and have not been reviewed by
-  native speakers;
+- the other non-English translations are AI-made and have not been reviewed
+  by native speakers;
 - No Kempston mouse or other add-on interfaces;
 - the window test (`waterbox/tests/run-frontend.sh`) still drives the old
   .NET frontend and is not run until it is ported to the Qt window. CI runs
