@@ -60,6 +60,7 @@ with open(path, "w") as f:
     f.write("\n")
 print(f"build-package: stamped version={commit} versionDate={when} (commit UTC, not build time)")
 PY
+rm -rf "$ROOT/dist/licenses"
 python3 "$MINIBOX_DIR/source/guest/package-licenses.py" "$ROOT" "$ROOT/dist"
 (cd "$ROOT/dist" && python3 - "$COMMIT" <<'PY'
 import json, sys, zipfile
