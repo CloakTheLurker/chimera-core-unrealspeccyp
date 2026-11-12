@@ -129,9 +129,7 @@ no `-dirty`, and create a GitHub release by hand. The package names
 `windows-x86_64` and `linux-x86_64` in `runsOn`; Chimera refuses it on any
 other system:
 
-- tag `dev` for the rolling build (pre-release, replaced next time by
-  deleting the release and its tag), or `nightly-YYYY-MM-DD` for an immutable
-  dated one;
+- tag `nightly-YYYY-MM-DD` for an immutable dated release;
 - asset named `unrealspeccyp-<sha>.chimeraCore`;
 - notes that say what changed, what the user must bring, and what was not
   proved.

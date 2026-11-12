@@ -218,11 +218,9 @@ A release is cut by hand:
    `+local` without git — neither is publishable).
 2. Check the package: the `waterbox.config` inside stamps the commit, no
    `-dirty`/`+local`; `core.wbx` and `licenses/` are in it.
-3. GitHub release: tag `dev` for the rolling build (pre-release; next time
-   delete the release and its tag and recreate) or `nightly-YYYY-MM-DD` for
-   an immutable dated one (Latest). Asset named
-   `unrealspeccyp-<sha>.chimeraCore`, never renamed. Notes: what changed,
-   what the user must bring, what was not proved.
+3. GitHub release: tag `nightly-YYYY-MM-DD` for an immutable dated release
+   (Latest). Asset named `unrealspeccyp-<sha>.chimeraCore`, never renamed.
+   Notes: what changed, what the user must bring, what was not proved.
 4. A nightly tag is never republished; a movie may name it.
 
 If it ever joins the official set: add the `publish` job and daily
