@@ -17,6 +17,8 @@
 #                     mhash and state all equal — the sandbox did not change
 #                     the answer. Guest legs run on Linux (natively on CI,
 #                     inside WSL Ubuntu from a Windows checkout).
+#  m2-refuse ........ a mounted file the core cannot open is refused (Init 0)
+#                     with GetLoadError's sentence, not booted firmware-only.
 # Name the test content: USP_TEST_CONTENT, else boot.tap (the default
 # distributable content the m3 legs rely on: it reaches a prompt and reacts
 # to input), else the first test-content file, firmware boot when none. Other
@@ -193,6 +195,25 @@ mismatch=0
 [ "$NM" = "$GM" ] || { echo "gate leg m2-parity: FAILED — mhash differs" >&2; mismatch=1; }
 [ "$mismatch" = "0" ] || exit 1
 echo "gate leg m2-parity: the sandbox did not change the answer"
+
+echo "gate leg m2-refuse: a mounted file that is not a program is refused, with a reason"
+# The engine's Init rule (chimera/source/engine/source/session.cpp): exactly 1
+# starts the machine, and a file the core cannot open must be answered 0 with
+# GetLoadError saying why. Booting firmware-only instead would look like the
+# file loading and then doing nothing.
+cp "$ROOT/docs/PLAN.md" "$ROOT/build/guest/not-a-program.txt"
+on_guest_host guest-legs.sh 1 --game not-a-program.txt --expect-refuse
+REFUSED=$(sed -n 's/^run-wbx refused: //p' "$WBXLOG" | head -n 1)
+echo "gate leg m2-refuse: $REFUSED"
+if [ -z "$REFUSED" ]; then
+  echo "gate leg m2-refuse: FAILED — the core did not refuse the file: $(tail -n 2 "$WBXLOG" | tr '\n' ' ')" >&2
+  exit 1
+fi
+case "$REFUSED" in
+  *"not a program this core can open"*) ;;
+  *) echo "gate leg m2-refuse: FAILED — no reason from the core (got '$REFUSED')" >&2; exit 1;;
+esac
+echo "gate leg m2-refuse: a .txt in the game slot is refused with the core's own sentence"
 
 echo "gate leg m3-input-teeth: Space+Enter held 600f must perturb the machine"
 SNK=$(state_of --frames 600 --clock virtual --input-keys 0x3 --input-from 0 --input-to 600)

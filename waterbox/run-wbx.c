@@ -69,13 +69,19 @@ static uintptr_t proc(mb_host *h, const char *name) {
   if(r.error_message[0]) { fprintf(stderr, "run-wbx: no export %s: %s\n", name, r.error_message); exit(2); }
   return r.data;
 }
+/* An export the engine treats as optional: absent is an answer, not an error. */
+static uintptr_t proc_optional(mb_host *h, const char *name) {
+  mb_return r;
+  wbx_get_proc_addr(h, name, &r);
+  if(r.error_message[0]) return 0;
+  return r.data;
+}
 static void die_if_dead(mb_host *h, const char *when) {
   char why[512]; mb_return r;
   wbx_get_death(h, why, sizeof why, &r);
   if(r.data) { fprintf(stderr, "run-wbx: guest dead %s: %s\n", when, why); exit(1); }
 }
 
-typedef int (MB_GUEST_ABI *bool_fn)(void);
 typedef void (MB_GUEST_ABI *frame_fn)(uint64_t);
 typedef const uint32_t *(MB_GUEST_ABI *bgra_fn)(void);
 typedef const uint8_t *(MB_GUEST_ABI *raw_fn)(void);
@@ -232,7 +238,26 @@ int main(int argc, char **argv) {
   }
 
   wbx_activate_host(h, &r);
-  if(!((bool_fn)proc(h, "Init"))()) { die_if_dead(h, "in Init"); fprintf(stderr, "run-wbx: Init returned false\n"); return 1; }
+  /* The engine's Init contract: EXACTLY 1 starts the machine, and anything else
+   * is a refusal, with the reason in GetLoadError. Typed int32_t here because
+   * that is how the engine calls it: a core returning a C++ bool answers in AL
+   * alone, with the rest of the register left over from the last call, and this
+   * check is the one that sees it ("nonzero" would not have). */
+  {
+    const int32_t started = ((int32_t (*)(void))proc(h, "Init"))();
+    if(started != 1) {
+      die_if_dead(h, "in Init");
+      if(started == 0) {
+        const char *(*get_load_error)(void) = (const char *(*)(void))proc_optional(h, "GetLoadError");
+        const char *reason = get_load_error != NULL ? get_load_error() : NULL;
+        fprintf(stderr, "run-wbx: the core refused the file: %s\n",
+          reason != NULL && reason[0] ? reason : "(no reason given)");
+      } else {
+        fprintf(stderr, "run-wbx: Init answered %d, not 1\n", (int)started);
+      }
+      return 1;
+    }
+  }
   wbx_deactivate_host(h, &r);
   wbx_seal(h, &r);
   if(r.error_message[0]) { fprintf(stderr, "run-wbx: seal: %s\n", r.error_message); return 1; }

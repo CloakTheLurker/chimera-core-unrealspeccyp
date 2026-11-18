@@ -538,3 +538,31 @@ the tables.
 Tested: `tools/check-core-texts.py` reports 17 keys, every one named and every
 name a key; `test-packages` on the assembled package passes every check. The
 core gate (m0-m6) is unchanged by this.
+
+## Init's answer, and a refused file (2026-11-18)
+
+The engine calls `Init` as an `int32_t` and requires exactly 1 to start a
+machine; anything else is a refusal and the frontend reports "UnrealSpeccyP
+could not load this file" (chimera/source/engine/source/session.cpp). This
+export was declared `bool`, which the ABI hands back in AL alone with the rest
+of RAX left over from the last call. Measured with a probe that calls it the
+engine's way: `0x00000001` for firmware-only, for a snapshot and for a tape —
+right today by luck, and one register away from refusing a machine that started.
+The zxpoly core, whose `Init` ended in a comparison, read `0xFF000001` and did
+refuse one (its 2026-11-18 entry); that is the failure this hardens against.
+
+- `Init` is `int32_t` and returns 1. A mounted game file it cannot open is now
+  refused: `Init` answers 0 and the new optional `GetLoadError` export answers
+  "the file is not a program this core can open (it reads tap, tzx, csw, sna,
+  z80, szx and zip)". Booting firmware-only instead looked like the file
+  loading and then doing nothing.
+- `run-wbx` requires exactly 1 - nonzero is the check that hid this class - and
+  prints the refusal reason. `guest-legs.sh --expect-refuse` drives that, and
+  the gate has a leg for it (`m2-refuse`).
+- Both halves were broken once and seen to fail: answering 1 after a failed open
+  turned `m2-refuse` red ("the core did not refuse the file"), and an answer of
+  2 made run-wbx print "Init answered 2, not 1".
+
+The machine's own behaviour is unchanged: the gate's parity, input, snapshot,
+tape, AY and session legs report the same numbers as before this change.
+

@@ -25,6 +25,9 @@ static Machine* g_machine = 0;
 static uint32_t g_bgra[320 * 240]; // == VideoWidth * VideoHeight (a static call is not a constant-expression)
 static int16_t g_audio[2048]; // > one frame (882 pairs) with headroom
 static uint32_t g_audioCount = 0; // stereo pairs in g_audio after the frame
+// Why Init refused the mounted file, if it did: the engine shows this after the
+// core's name in place of "could not load this file".
+static char g_loadError[256];
 
 // Lag frames: set when the emulated program reads the keyboard or Kempston
 // joystick during a frame (patched IoRead hooks in devices/input); cleared
@@ -32,7 +35,15 @@ static uint32_t g_audioCount = 0; // stereo pairs in g_audio after the frame
 // lag. Native builds never compile this file, so no flavor split is needed.
 int g_wbx_inputWasRead = 0;
 
-ECL_EXPORT bool Init(void) {
+// The engine's Init contract (chimera/source/engine/source/session.cpp): Init is
+// called as an int32_t and must answer EXACTLY 1 to start; anything else is a
+// refusal, and the frontend then reports "<core> could not load this file". This
+// answered a C++ bool, which the ABI hands back in AL alone with the rest of RAX
+// left over from the last call: right today only because that leftover is 0
+// (measured 0x00000001 in every path), and one register away from refusing a
+// machine that started. int32_t makes the whole register say 1.
+ECL_EXPORT int32_t Init(void) {
+  g_loadError[0] = 0;
   g_machine = new Machine();
   char machine[16] = {0};
   int mode48k = 0; // default machine is the 128K Pentagon (status quo)
@@ -50,11 +61,17 @@ ECL_EXPORT bool Init(void) {
   // "/basename"); a project mounts slot files under their own names. Read
   // rom.name when it exists and open that; without it, boot firmware-only.
   char romname[512] = {0};
+  bool mounted = false;
   FILE* rf = fopen("rom.name", "rb");
   if(rf) {
     size_t n = fread(romname, 1, sizeof romname - 1, rf);
     fclose(rf);
     romname[n] = 0;
+    // An empty name is "nothing mounted": boot firmware-only, the ordinary
+    // state of a project whose game slot is empty.
+    mounted = romname[0] != 0;
+  }
+  if(mounted) {
     // A project mounts each slot file under its own name, so the bare name
     // opens directly. A directly-opened rom is mounted at romFile ("rom")
     // plus a "/basename" alias; rom.name carries one of those two spellings.
@@ -69,9 +86,26 @@ ECL_EXPORT bool Init(void) {
     if(!g_machine->OpenFile(romname)
         && !(slashed[0] && g_machine->OpenFile(slashed))
         && !g_machine->OpenFile("rom"))
-      return false;
+    {
+      // A file was mounted and is no tape, snapshot or zip this core knows.
+      // Refusing says so; booting firmware-only would look like the file
+      // loading and then doing nothing.
+      snprintf(g_loadError, sizeof g_loadError,
+        "the file is not a program this core can open (it reads tap, tzx, csw, sna, z80, szx and zip)");
+      // Nothing of this machine survives the refusal: the answer and the state
+      // agree, so a frontend that starts again gets a fresh one.
+      delete g_machine;
+      g_machine = 0;
+      return 0;
+    }
   }
-  return g_machine != 0;
+  return 1;
+}
+
+// Optional to the engine: read only after Init refused, and shown after the
+// core's name, so this is the sentence and not the whole message.
+ECL_EXPORT const char* GetLoadError(void) {
+  return g_loadError;
 }
 
 // The engine's packed button mask, whole level every frame.

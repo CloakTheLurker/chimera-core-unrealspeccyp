@@ -7,6 +7,8 @@
 # and is copied to GATE_SCRATCH: a space-free path that survives `wsl -t`
 # (the gate kills WSL between the two-process legs).
 # Prints run-wbx summary lines to stdout for the gate to parse.
+# --expect-refuse: the file mounted with --game must be refused by the core, with
+# a reason; prints "run-wbx refused: <reason>" and exits 0.
 set -eu
 . "$(dirname "$0")/env.sh"
 FRAMES=${1:-600}
@@ -15,6 +17,7 @@ GUEST_DIR="$WIN_CORE/build/guest"
 SCRATCH=${GATE_SCRATCH:-/var/tmp/chimera-usp-gate}
 mkdir -p "$SCRATCH"
 ARGS=""
+EXPECT_REFUSE=0
 while [ $# -gt 0 ]; do
   if [ "$1" = "--settings-json" ]; then
     shift
@@ -45,6 +48,13 @@ while [ $# -gt 0 ]; do
     if [ "$TS" != "$TB" ]; then cp "$TS" "$TB"; fi
     ARGS="$ARGS --type-file $TB"
     shift || true
+  elif [ "$1" = "--expect-refuse" ]; then
+    # The engine's Init rule, from the core's side: a mounted file it cannot
+    # open must be answered 0 with a reason, not booted empty. Prints the
+    # reason on a line that starts with "run-wbx " so the gate's WSL leg can
+    # find it with the same marker as a normal run.
+    EXPECT_REFUSE=1
+    shift || true
   else
     ARGS="$ARGS $1"
     shift || true
@@ -62,5 +72,24 @@ fi
 gcc -O2 -I"$MB_HOST_INC" -I"$WIN_CORE/waterbox" \
   "$WIN_CORE/waterbox/run-wbx.c" -o "$GUEST_DIR/run-wbx" \
   -L"$MB_HOST_LIB" -lminiboxhost "-Wl,-rpath,$MB_HOST_LIB"
+if [ "$EXPECT_REFUSE" = "1" ]; then
+  set +e
+  # shellcheck disable=SC2086
+  REFUSED_OUT=$("$GUEST_DIR/run-wbx" --frames "$FRAMES" $ARGS "$GUEST_DIR/core.wbx" 2>&1)
+  REFUSED_STATUS=$?
+  set -e
+  if [ "$REFUSED_STATUS" -eq 0 ]; then
+    echo "guest-legs: the core accepted a file it must refuse (status 0)" >&2
+    exit 1
+  fi
+  REFUSED_REASON=$(printf '%s\n' "$REFUSED_OUT" \
+    | sed -n 's/^run-wbx: the core refused the file: //p' | head -n 1)
+  if [ -z "$REFUSED_REASON" ]; then
+    echo "guest-legs: no refusal reason; run-wbx said: $REFUSED_OUT" >&2
+    exit 1
+  fi
+  echo "run-wbx refused: $REFUSED_REASON"
+  exit 0
+fi
 # shellcheck disable=SC2086
 "$GUEST_DIR/run-wbx" --frames "$FRAMES" $ARGS "$GUEST_DIR/core.wbx"

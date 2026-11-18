@@ -68,6 +68,16 @@ CHIMERA_CORES_DIR=<dist> chimera/build/meson-linux/source/ui/test-packages
 
 The window test is not in CI yet (see above).
 
+`Init` is the engine's load answer and its rule is exact: called as an `int32_t`,
+it must return 1 to start, and anything else refuses the file
+(chimera/source/engine/source/session.cpp). A core whose `Init` is a C++ `bool`
+answers in AL alone with the rest of the register left over from the last call,
+which the engine reads as a refusal; `run-wbx` applies the same exact rule so the
+gate catches it. A mounted game file the core cannot open is refused (0) with a
+sentence from the optional `GetLoadError` export, which the engine shows after
+the core's name; `guest-legs.sh --expect-refuse` and the gate's `m2-refuse` leg
+exercise that.
+
 The ROM/game matrix (`waterbox/tests/run-rom-matrix.sh`) is local-only: it
 needs copyrighted content from `ROMs/`, which is gitignored and never on a
 runner.
